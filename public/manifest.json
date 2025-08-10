@@ -1,0 +1,43 @@
+{
+  "name": "MuscleGram - 筋トレSNSアプリ",
+  "short_name": "MuscleGram",
+  "description": "筋力トレーニングに特化したソーシャルネットワークアプリケーション",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "orientation": "portrait-primary",
+  "categories": ["fitness", "health", "social"],
+  "lang": "ja",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg", 
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "MuscleGram ワークアウト画面"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
+      "type": "image/png", 
+      "form_factor": "narrow",
+      "label": "MuscleGram モバイル画面"
+    }
+  ]
+}
