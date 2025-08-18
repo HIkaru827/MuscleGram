@@ -12,11 +12,24 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
-import { createPost } from "@/lib/firestore"
+import { useWorkout } from "@/contexts/WorkoutContext"
+import { createPost, savePR, getLatestPRForExercise } from "@/lib/firestore"
 import { uploadMultipleImages, validateImageFile, compressImage } from "@/lib/storage"
 import { toast } from "sonner"
 import { usePWA } from "@/hooks/usePWA"
 import TimerDialog from "./timer-dialog"
+import PRRecommendationModal from "./PR/PRRecommendationModal"
+import WorkoutCalendar from "./workout-calendar"
+import { 
+  calculateE1RM, 
+  findBestE1RMSet, 
+  findBestWeightReps, 
+  findBestRepSpecificPR, 
+  calculateSessionVolume, 
+  calculateImprovement,
+  getPRBadgeInfo,
+  PRRecord 
+} from "@/lib/pr-utils"
 
 interface Exercise {
   id: string
@@ -38,14 +51,6 @@ interface MuscleGroup {
   showAll: boolean
 }
 
-interface WorkoutEntry {
-  exerciseId: string
-  exerciseName: string
-  sets: Array<{
-    weight: number
-    reps: number
-  }>
-}
 
 const defaultMuscleGroups: MuscleGroup[] = [
   {
@@ -131,21 +136,32 @@ const defaultMuscleGroups: MuscleGroup[] = [
 export default function RecordScreen() {
   const { user } = useAuth()
   const { startWorkoutTimer, setTimer } = usePWA()
+  const {
+    isWorkoutActive,
+    workoutStartTime,
+    currentWorkout,
+    workoutDuration,
+    startWorkout: startWorkoutContext,
+    finishWorkout: finishWorkoutContext,
+    addExerciseToWorkout,
+    updateSet,
+    addSet,
+    removeSet
+  } = useWorkout()
   const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
   const [showAddGroup, setShowAddGroup] = useState(false)
   const [showAddExercise, setShowAddExercise] = useState<string | null>(null)
   const [newGroupForm, setNewGroupForm] = useState({ name: "", color: "bg-gray-600" })
   const [newExerciseForm, setNewExerciseForm] = useState({ name: "", hasVideo: false })
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [currentWorkout, setCurrentWorkout] = useState<WorkoutEntry[]>([])
-  const [isWorkoutActive, setIsWorkoutActive] = useState(false)
-  const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null)
   const [showPostDialog, setShowPostDialog] = useState(false)
   const [postComment, setPostComment] = useState("")
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([])
   const [posting, setPosting] = useState(false)
   const [showTimerDialog, setShowTimerDialog] = useState(false)
+  const [newPRs, setNewPRs] = useState<PRRecord[]>([])
+  const [showPRCelebration, setShowPRCelebration] = useState(false)
+  const [showPRRecommendation, setShowPRRecommendation] = useState(false)
 
   // Load muscle groups from localStorage or use defaults
   useEffect(() => {
@@ -165,20 +181,6 @@ export default function RecordScreen() {
     localStorage.setItem('muscleGroups', JSON.stringify(groups))
   }
 
-  // Update current time every second when workout is active
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (isWorkoutActive) {
-      interval = setInterval(() => {
-        setCurrentTime(new Date())
-      }, 1000)
-    }
-    return () => {
-      if (interval) {
-        clearInterval(interval)
-      }
-    }
-  }, [isWorkoutActive])
 
   // Calculate 1RM using Epley formula: weight * (1 + reps/30)
   const calculate1RM = (weight: number, reps: number): number => {
@@ -232,60 +234,23 @@ export default function RecordScreen() {
   }
 
   const startWorkout = () => {
-    const now = new Date()
-    setIsWorkoutActive(true)
-    setWorkoutStartTime(now)
-    setCurrentWorkout([])
-    startWorkoutTimer(now.getTime())
-  }
-
-  const addExerciseToWorkout = (exercise: Exercise) => {
-    const existingEntry = currentWorkout.find(entry => entry.exerciseId === exercise.id)
-    
-    if (!existingEntry) {
-      const newEntry: WorkoutEntry = {
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        sets: [{ weight: exercise.lastPerformed?.weight || 0, reps: exercise.lastPerformed?.reps || 0 }]
-      }
-      setCurrentWorkout(prev => [...prev, newEntry])
+    startWorkoutContext()
+    if (workoutStartTime) {
+      startWorkoutTimer(workoutStartTime.getTime())
     }
   }
 
-  const updateSet = (exerciseId: string, setIndex: number, field: 'weight' | 'reps', value: number) => {
-    setCurrentWorkout(prev =>
-      prev.map(entry =>
-        entry.exerciseId === exerciseId
-          ? {
-              ...entry,
-              sets: entry.sets.map((set, index) =>
-                index === setIndex ? { ...set, [field]: value } : set
-              )
-            }
-          : entry
-      )
-    )
+  const handleAddExerciseToWorkout = (exercise: Exercise) => {
+    addExerciseToWorkout(exercise.id, exercise.name, exercise.lastPerformed)
   }
 
-  const addSet = (exerciseId: string) => {
-    setCurrentWorkout(prev =>
-      prev.map(entry =>
-        entry.exerciseId === exerciseId
-          ? {
-              ...entry,
-              sets: [...entry.sets, { weight: entry.sets[entry.sets.length - 1]?.weight || 0, reps: entry.sets[entry.sets.length - 1]?.reps || 0 }]
-            }
-          : entry
-      )
-    )
-  }
+
 
   const finishWorkout = () => {
     if (currentWorkout.length > 0) {
       setShowPostDialog(true)
     } else {
-      setIsWorkoutActive(false)
-      setWorkoutStartTime(null)
+      finishWorkoutContext()
     }
   }
 
@@ -304,17 +269,134 @@ export default function RecordScreen() {
     setSelectedPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  const removeSet = (exerciseId: string, setIndex: number) => {
-    setCurrentWorkout(prev =>
-      prev.map(entry =>
-        entry.exerciseId === exerciseId
-          ? {
-              ...entry,
-              sets: entry.sets.filter((_, index) => index !== setIndex)
+
+  const calculateWorkoutPRs = async (): Promise<PRRecord[]> => {
+    if (!user || !workoutStartTime) return []
+
+    const prs: PRRecord[] = []
+    const workoutId = Date.now().toString()
+
+    // Calculate session volume PR
+    const sessionVolume = calculateSessionVolume(currentWorkout)
+    const latestVolumePR = await getLatestPRForExercise(user.uid, 'session', 'session_volume')
+    
+    if (!latestVolumePR || sessionVolume > latestVolumePR.value) {
+      const improvement = latestVolumePR ? calculateImprovement(sessionVolume, latestVolumePR.value) : 0
+      const prRecord: PRRecord = {
+        id: `${workoutId}_session_volume`,
+        userId: user.uid,
+        exerciseName: 'session',
+        prType: 'session_volume',
+        value: sessionVolume,
+        date: new Date(),
+        workoutId,
+        improvement
+      }
+      
+      // Only add previousBest if it exists
+      if (latestVolumePR?.value !== undefined) {
+        prRecord.previousBest = latestVolumePR.value
+      }
+      
+      prs.push(prRecord)
+    }
+
+    // Calculate exercise-specific PRs
+    for (const workout of currentWorkout) {
+      const { exerciseId, exerciseName, sets } = workout
+      
+      // e1RM PR
+      const bestE1RMSet = findBestE1RMSet(sets)
+      if (bestE1RMSet) {
+        const latestE1RMPR = await getLatestPRForExercise(user.uid, exerciseName, 'e1RM')
+        
+        if (!latestE1RMPR || bestE1RMSet.e1rm > latestE1RMPR.value) {
+          const improvement = latestE1RMPR ? calculateImprovement(bestE1RMSet.e1rm, latestE1RMPR.value) : 0
+          const prRecord: PRRecord = {
+            id: `${workoutId}_${exerciseId}_e1rm`,
+            userId: user.uid,
+            exerciseName,
+            prType: 'e1RM',
+            value: bestE1RMSet.e1rm,
+            weight: bestE1RMSet.set.weight,
+            reps: bestE1RMSet.set.reps,
+            date: new Date(),
+            workoutId,
+            improvement
+          }
+          
+          // Only add previousBest if it exists
+          if (latestE1RMPR?.value !== undefined) {
+            prRecord.previousBest = latestE1RMPR.value
+          }
+          
+          prs.push(prRecord)
+        }
+      }
+
+      // Weight x Reps PR
+      const bestWeightReps = findBestWeightReps(sets)
+      if (bestWeightReps) {
+        const latestWeightRepsPR = await getLatestPRForExercise(user.uid, exerciseName, 'weight_reps')
+        
+        if (!latestWeightRepsPR || bestWeightReps.value > latestWeightRepsPR.value) {
+          const improvement = latestWeightRepsPR ? calculateImprovement(bestWeightReps.value, latestWeightRepsPR.value) : 0
+          const prRecord: PRRecord = {
+            id: `${workoutId}_${exerciseId}_weight_reps`,
+            userId: user.uid,
+            exerciseName,
+            prType: 'weight_reps',
+            value: bestWeightReps.value,
+            weight: bestWeightReps.set.weight,
+            reps: bestWeightReps.set.reps,
+            date: new Date(),
+            workoutId,
+            improvement
+          }
+          
+          // Only add previousBest if it exists
+          if (latestWeightRepsPR?.value !== undefined) {
+            prRecord.previousBest = latestWeightRepsPR.value
+          }
+          
+          prs.push(prRecord)
+        }
+      }
+
+      // Rep-specific PRs (3RM, 5RM, 8RM)
+      for (const targetReps of [3, 5, 8]) {
+        const repPR = findBestRepSpecificPR(sets, targetReps)
+        if (repPR) {
+          const prType = `${targetReps}RM` as PRRecord['prType']
+          const latestRepPR = await getLatestPRForExercise(user.uid, exerciseName, prType)
+          
+          if (!latestRepPR || repPR.weight > latestRepPR.value) {
+            const improvement = latestRepPR ? calculateImprovement(repPR.weight, latestRepPR.value) : 0
+            const prRecord: PRRecord = {
+              id: `${workoutId}_${exerciseId}_${targetReps}rm`,
+              userId: user.uid,
+              exerciseName,
+              prType,
+              value: repPR.weight,
+              weight: repPR.weight,
+              reps: targetReps,
+              date: new Date(),
+              workoutId,
+              improvement
             }
-          : entry
-      ).filter(entry => entry.sets.length > 0) // Remove exercise if no sets remain
-    )
+            
+            // Only add previousBest if it exists
+            if (latestRepPR?.value !== undefined) {
+              prRecord.previousBest = latestRepPR.value
+            }
+            
+            prs.push(prRecord)
+          }
+        }
+      }
+    }
+
+    return prs
   }
 
   const handlePostWorkout = async () => {
@@ -323,6 +405,10 @@ export default function RecordScreen() {
     setPosting(true)
 
     try {
+      // Calculate PRs before posting
+      const calculatedPRs = await calculateWorkoutPRs()
+      setNewPRs(calculatedPRs)
+      
       let photoUrls: string[] = []
 
       // Upload photos if any
@@ -355,14 +441,28 @@ export default function RecordScreen() {
         isPublic: true
       }
 
-      await createPost(postData)
+      const postRef = await createPost(postData)
       
-      toast.success("ワークアウトを投稿しました！")
+      // Save PRs to Firestore
+      await Promise.all(
+        calculatedPRs.map(pr => 
+          savePR({ ...pr, workoutId: postRef.id })
+        )
+      )
+      
+      if (calculatedPRs.length > 0) {
+        setShowPRCelebration(true)
+        // Show recommendation modal after celebration
+        setTimeout(() => {
+          setShowPRRecommendation(true)
+        }, 3000)
+        toast.success(`ワークアウトを投稿しました！${calculatedPRs.length}件のPR達成！`)
+      } else {
+        toast.success("ワークアウトを投稿しました！")
+      }
       
       // Reset state
-      setCurrentWorkout([])
-      setIsWorkoutActive(false)
-      setWorkoutStartTime(null)
+      finishWorkoutContext()
       setShowPostDialog(false)
       setPostComment("")
       setSelectedPhotos([])
@@ -376,12 +476,6 @@ export default function RecordScreen() {
   }
 
   if (isWorkoutActive) {
-    const workoutDurationMs = workoutStartTime 
-      ? currentTime.getTime() - workoutStartTime.getTime()
-      : 0
-    const workoutMinutes = Math.floor(workoutDurationMs / 60000)
-    const workoutSeconds = Math.floor((workoutDurationMs % 60000) / 1000)
-    const workoutDurationFormatted = `${workoutMinutes.toString().padStart(2, '0')}:${workoutSeconds.toString().padStart(2, '0')}`
 
     return (
       <div className="max-w-2xl mx-auto p-4 pb-24">
@@ -390,7 +484,7 @@ export default function RecordScreen() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-red-600">
               <Clock className="w-5 h-5" />
-              <span className="font-medium font-mono text-lg">{workoutDurationFormatted}</span>
+              <span className="font-medium font-mono text-lg">{workoutDuration}</span>
             </div>
             <Button 
               onClick={() => setShowTimerDialog(true)} 
@@ -423,7 +517,7 @@ export default function RecordScreen() {
                 
                 <div className="space-y-2">
                   {entry.sets.map((set, setIndex) => {
-                    const oneRM = calculate1RM(set.weight, set.reps)
+                    const e1rm = calculateE1RM(set.weight, set.reps)
                     return (
                       <div key={setIndex} className="flex items-center space-x-2">
                         <span className="w-8 text-sm text-gray-500">#{setIndex + 1}</span>
@@ -447,10 +541,10 @@ export default function RecordScreen() {
                           />
                           <span className="text-sm text-gray-500">回</span>
                         </div>
-                        {oneRM > 0 && (
-                          <div className="flex items-center space-x-1 text-xs text-blue-600">
-                            <span>1RM:</span>
-                            <span className="font-medium">{oneRM}kg</span>
+                        {e1rm > 0 && (
+                          <div className="flex items-center space-x-1 text-xs text-purple-600">
+                            <span>e1RM:</span>
+                            <span className="font-medium">{e1rm.toFixed(1)}kg</span>
                           </div>
                         )}
                         <Button
@@ -564,7 +658,7 @@ export default function RecordScreen() {
                           key={exercise.id}
                           variant="outline"
                           className="w-full justify-start"
-                          onClick={() => addExerciseToWorkout(exercise)}
+                          onClick={() => handleAddExerciseToWorkout(exercise)}
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           {exercise.name}
@@ -698,6 +792,13 @@ export default function RecordScreen() {
           </Button>
         </div>
       </div>
+
+      <div className="mb-6">
+        <div className="text-center text-gray-600 mb-4">
+          習慣の可視化とモチベーション強化のために、あなたのワークアウト履歴をカレンダーで確認しましょう。
+        </div>
+        <WorkoutCalendar />
+      </div>
       
       {/* Add Group Dialog */}
       {showAddGroup && (
@@ -740,9 +841,6 @@ export default function RecordScreen() {
                   <div className={`w-4 h-4 rounded-full ${group.color}`} />
                   <div>
                     <h3 className="font-medium text-gray-900">{group.name}</h3>
-                    {group.lastWorkout && (
-                      <p className="text-sm text-gray-500">{group.lastWorkout}</p>
-                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -786,11 +884,6 @@ export default function RecordScreen() {
                     <div key={exercise.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                       <div>
                         <p className="font-medium text-gray-900">{exercise.name}</p>
-                        {exercise.lastPerformed && (
-                          <p className="text-sm text-gray-500">
-                            前回: {exercise.lastPerformed.weight}kg × {exercise.lastPerformed.reps}回
-                          </p>
-                        )}
                       </div>
                       {exercise.hasVideo && (
                         <Badge variant="secondary" className="text-xs">
@@ -809,6 +902,66 @@ export default function RecordScreen() {
       <TimerDialog 
         isOpen={showTimerDialog} 
         onOpenChange={setShowTimerDialog} 
+      />
+
+      {/* PR Celebration Dialog */}
+      <Dialog open={showPRCelebration} onOpenChange={setShowPRCelebration}>
+        <DialogContent className="max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl">
+              🎉 PR達成！ 🎉
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="text-center text-gray-600 mb-4">
+              {newPRs.length}件の新記録を達成しました！
+            </div>
+            
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {newPRs.map((pr) => {
+                const badgeInfo = getPRBadgeInfo(pr.prType, pr.improvement || 0)
+                return (
+                  <div key={pr.id} className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="font-medium text-gray-900">{pr.exerciseName}</span>
+                          <Badge className={`text-xs ${badgeInfo.color}`}>
+                            {badgeInfo.text}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {pr.prType === 'e1RM' && `e1RM: ${pr.value.toFixed(2)}kg`}
+                          {pr.prType === 'weight_reps' && `${pr.weight}kg × ${pr.reps}回`}
+                          {pr.prType === 'session_volume' && `総重量: ${(pr.value / 1000).toFixed(1)}t`}
+                          {['3RM', '5RM', '8RM'].includes(pr.prType) && `${pr.weight}kg`}
+                        </div>
+                      </div>
+                      <div className="text-2xl">🏆</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            
+            <div className="flex justify-center pt-4">
+              <Button 
+                onClick={() => setShowPRCelebration(false)}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                続ける
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PR Recommendation Modal */}
+      <PRRecommendationModal
+        isOpen={showPRRecommendation}
+        onOpenChange={setShowPRRecommendation}
+        prs={newPRs}
       />
     </div>
   )

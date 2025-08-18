@@ -14,6 +14,13 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
+// Check if we're in demo mode
+const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+
+if (isDemoMode) {
+  console.warn('Running in demo mode. Firebase services will not work. Please configure your Firebase project.')
+}
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
 
@@ -22,10 +29,14 @@ export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 
-// Initialize Analytics (only in browser)
+// Initialize Analytics (only in browser and only with valid config)
 let analytics: any = null
-if (typeof window !== 'undefined') {
-  analytics = getAnalytics(app)
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key') {
+  try {
+    analytics = getAnalytics(app)
+  } catch (error) {
+    console.warn('Analytics initialization failed:', error)
+  }
 }
 export { analytics }
 

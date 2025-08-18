@@ -53,6 +53,18 @@ export default function ProfileScreen() {
         return
       }
 
+      // Check if we're in demo mode
+      const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+      
+      if (isDemoMode) {
+        // Create demo posts
+        const demoPosts: WorkoutPost[] = []
+        setUserPosts(demoPosts)
+        setStats({ totalWorkouts: 15, totalVolume: 12500, averageDuration: 52, favoriteExercise: 'ベンチプレス' })
+        setLoading(false)
+        return
+      }
+
       try {
         // Load user's posts
         const posts = await getPosts(user.uid, 50)

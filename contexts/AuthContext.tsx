@@ -131,6 +131,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    // Check if we're in demo mode
+    const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+    
+    if (isDemoMode) {
+      // In demo mode, create a mock user to show UI
+      const mockUser = {
+        uid: 'demo-user',
+        email: 'demo@example.com',
+        displayName: 'Demo User',
+        photoURL: null,
+      } as any
+
+      setUser(mockUser)
+      setUserProfile({
+        uid: 'demo-user',
+        email: 'demo@example.com',
+        displayName: 'Demo User',
+        photoURL: '',
+        bio: 'This is a demo user for testing the UI',
+        followers: 10,
+        following: 5,
+        postsCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      setLoading(false)
+      return
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user)

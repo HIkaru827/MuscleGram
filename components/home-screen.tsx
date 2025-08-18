@@ -1,24 +1,30 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Heart, MessageCircle, Share, MoreHorizontal, Search, Filter } from "lucide-react"
+import { Heart, MessageCircle, Share, MoreHorizontal, Search, Filter, Trash2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/AuthContext"
 import { WorkoutPost as WorkoutPostType } from "@/types"
-import { subscribeToTimelinePosts, toggleLike, getUser } from "@/lib/firestore"
+import { subscribeToTimelinePosts, toggleLike, getUser, deletePost } from "@/lib/firestore"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
+import { toast } from "sonner"
 
 export default function HomeScreen() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<WorkoutPostType[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(true)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [postToDelete, setPostToDelete] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const handleLike = async (postId: string) => {
     if (!user) return
@@ -41,6 +47,33 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error toggling like:', error)
     }
+  }
+
+  const handleDeletePost = async () => {
+    if (!user || !postToDelete) return
+
+    setDeleting(true)
+    try {
+      await deletePost(postToDelete, user.uid)
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== postToDelete))
+      
+      // Dispatch custom event to notify other components about post deletion
+      window.dispatchEvent(new CustomEvent('postDeleted', { detail: { postId: postToDelete } }))
+      
+      toast.success("投稿を削除しました")
+    } catch (error: any) {
+      console.error('Error deleting post:', error)
+      toast.error(error.message || "投稿の削除に失敗しました")
+    } finally {
+      setDeleting(false)
+      setShowDeleteDialog(false)
+      setPostToDelete(null)
+    }
+  }
+
+  const openDeleteDialog = (postId: string) => {
+    setPostToDelete(postId)
+    setShowDeleteDialog(true)
   }
 
   useEffect(() => {
@@ -128,9 +161,24 @@ export default function HomeScreen() {
                       <span className="text-gray-500 text-sm">
                         {post.createdAt && format(post.createdAt.toDate(), 'MM/dd HH:mm', { locale: ja })}
                       </span>
-                      <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
+                      {post.userId === user?.uid && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => openDeleteDialog(post.id)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              削除
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -220,6 +268,37 @@ export default function HomeScreen() {
           )}
         </div>
       </ScrollArea>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>投稿を削除</AlertDialogTitle>
+            <AlertDialogDescription>
+              この投稿を削除してもよろしいですか？この操作は元に戻せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              キャンセル
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePost}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  <span>削除中...</span>
+                </div>
+              ) : (
+                "削除"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
