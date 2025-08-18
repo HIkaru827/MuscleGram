@@ -16,6 +16,7 @@ import { subscribeToTimelinePosts, toggleLike, getUser, deletePost } from "@/lib
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { toast } from "sonner"
+import NextTrainingRecommendations from "@/components/next-training-recommendations"
 
 export default function HomeScreen() {
   const { user } = useAuth()
@@ -133,8 +134,19 @@ export default function HomeScreen() {
         </div>
       </div>
 
+      {/* Training Recommendations */}
+      <div className="p-4 bg-white border-b border-gray-100">
+        <NextTrainingRecommendations 
+          maxItems={3}
+          onExerciseSelect={(exerciseName) => {
+            // Navigate to record screen with pre-selected exercise
+            console.log('Selected exercise:', exerciseName)
+          }}
+        />
+      </div>
+
       {/* Posts Timeline */}
-      <ScrollArea className="h-[calc(100vh-200px)]">
+      <ScrollArea className="h-[calc(100vh-280px)]">
         <div className="space-y-6 p-4">
           {posts.length === 0 ? (
             <div className="text-center text-gray-500 py-8">

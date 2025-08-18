@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import React from "react"
 import { ArrowLeft, Plus, Edit, Play, Home, BarChart3, Scale, ShoppingBag, Clock, Camera, Send, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -17,6 +18,8 @@ import { createPost, savePR, getLatestPRForExercise } from "@/lib/firestore"
 import { uploadMultipleImages, validateImageFile, compressImage } from "@/lib/storage"
 import { toast } from "sonner"
 import { usePWA } from "@/hooks/usePWA"
+import { isToday as isTodayFn, format } from "date-fns"
+import { Timestamp } from "firebase/firestore"
 import TimerDialog from "./timer-dialog"
 import PRRecommendationModal from "./PR/PRRecommendationModal"
 import WorkoutCalendar from "./workout-calendar"
@@ -49,6 +52,14 @@ interface MuscleGroup {
   lastWorkout?: string
   exercises: Exercise[]
   showAll: boolean
+}
+
+// 記録モードの型定義
+type RecordMode = 'live' | 'manual'
+
+interface ManualTimeInput {
+  startTime: string
+  endTime: string
 }
 
 
@@ -162,6 +173,22 @@ export default function RecordScreen() {
   const [newPRs, setNewPRs] = useState<PRRecord[]>([])
   const [showPRCelebration, setShowPRCelebration] = useState(false)
   const [showPRRecommendation, setShowPRRecommendation] = useState(false)
+  
+  // 記録モード関連の状態
+  const [recordMode, setRecordMode] = useState<RecordMode>('live')
+  const [manualTimeInput, setManualTimeInput] = useState<ManualTimeInput>({
+    startTime: '',
+    endTime: ''
+  })
+  const [recordDate, setRecordDate] = useState<string>('')
+  const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState<number>(0)
+
+  // 初期化：デフォルトでライブ記録モードに設定
+  useEffect(() => {
+    setRecordMode('live')
+    setRecordDate('')
+    setManualTimeInput({ startTime: '', endTime: '' })
+  }, [])
 
   // Load muscle groups from localStorage or use defaults
   useEffect(() => {
@@ -233,15 +260,78 @@ export default function RecordScreen() {
     setShowAddExercise(null)
   }
 
+  // 手動記録モード用のヘルパー関数
+  const calculateManualDuration = (): number => {
+    if (!manualTimeInput.startTime || !manualTimeInput.endTime) return 0
+    
+    const startTime = new Date(`2000-01-01T${manualTimeInput.startTime}:00`)
+    const endTime = new Date(`2000-01-01T${manualTimeInput.endTime}:00`)
+    
+    const diffMs = endTime.getTime() - startTime.getTime()
+    return Math.max(0, Math.round(diffMs / 60000)) // 分単位
+  }
+
+  const isValidManualTime = (): boolean => {
+    if (!manualTimeInput.startTime || !manualTimeInput.endTime) return false
+    
+    const startTime = new Date(`2000-01-01T${manualTimeInput.startTime}:00`)
+    const endTime = new Date(`2000-01-01T${manualTimeInput.endTime}:00`)
+    
+    return endTime >= startTime
+  }
+
   const startWorkout = () => {
-    startWorkoutContext()
-    if (workoutStartTime) {
-      startWorkoutTimer(workoutStartTime.getTime())
+    if (recordMode === 'manual') {
+      // 手動記録モードでは即座にワークアウトを開始
+      startWorkoutContext()
+    } else {
+      // ライブ記録モードでは通常通りタイマーを開始
+      startWorkoutContext()
+      if (workoutStartTime) {
+        startWorkoutTimer(workoutStartTime.getTime())
+      }
     }
   }
 
   const handleAddExerciseToWorkout = (exercise: Exercise) => {
     addExerciseToWorkout(exercise.id, exercise.name, exercise.lastPerformed)
+  }
+
+  // カレンダー日付クリック時のナビゲーション処理
+  const handleCalendarNavigation = (clickedDate: Date, isToday: boolean) => {
+    // ローカルタイムゾーンを考慮した日付文字列を生成
+    const dateStr = format(clickedDate, 'yyyy-MM-dd')
+    
+    console.log('Calendar navigation:', {
+      clickedDate,
+      dateStr,
+      isToday,
+      clickedDateString: format(clickedDate, 'yyyy-MM-dd HH:mm:ss')
+    })
+    
+    if (isToday) {
+      // 今日をクリックした場合はライブ記録モード
+      setRecordMode('live')
+      setRecordDate('')
+      setManualTimeInput({ startTime: '', endTime: '' })
+    } else {
+      // 過去の日付をクリックした場合は手動記録モード
+      setRecordMode('manual')
+      setRecordDate(dateStr)
+      
+      // 現在の時刻を初期値として設定
+      const now = new Date()
+      const currentTime = now.toTimeString().slice(0, 5) // HH:MM形式
+      setManualTimeInput({
+        startTime: currentTime,
+        endTime: currentTime
+      })
+      
+      // 手動記録モードの場合は即座にワークアウトを開始
+      if (!isWorkoutActive) {
+        startWorkoutContext()
+      }
+    }
   }
 
 
@@ -419,12 +509,23 @@ export default function RecordScreen() {
         photoUrls = await uploadMultipleImages(compressedPhotos, 'workout-photos')
       }
 
-      // Calculate workout duration
-      const duration = workoutStartTime 
-        ? Math.round((new Date().getTime() - workoutStartTime.getTime()) / 60000) // in minutes
-        : 0
+      // Calculate workout duration based on mode
+      const duration = recordMode === 'manual' 
+        ? calculateManualDuration()
+        : workoutStartTime 
+          ? Math.round((new Date().getTime() - workoutStartTime.getTime()) / 60000) // in minutes
+          : 0
 
-      // Create post data
+      // Create post data with appropriate date
+      const postDate = recordMode === 'manual' && recordDate 
+        ? (() => {
+            // 手動記録の場合：ローカル時間で指定日の12:00に設定
+            const [year, month, day] = recordDate.split('-').map(Number)
+            const localDate = new Date(year, month - 1, day, 12, 0, 0)
+            return Timestamp.fromDate(localDate)
+          })()
+        : Timestamp.fromDate(new Date()) // ライブ記録の場合は現在時刻
+
       const postData = {
         userId: user.uid,
         exercises: currentWorkout.map(entry => ({
@@ -438,9 +539,20 @@ export default function RecordScreen() {
         likes: 0,
         likedBy: [],
         comments: 0,
-        isPublic: true
+        isPublic: true,
+        createdAt: postDate, // 手動記録の場合は指定した日付を設定
+        recordMode: recordMode, // 記録モードも保存
+        recordDate: recordDate || format(new Date(), 'yyyy-MM-dd') // 記録対象日
       }
 
+      console.log('Creating post with data:', {
+        recordMode,
+        recordDate,
+        createdAt: postData.createdAt,
+        createdAtDate: postData.createdAt.toDate(),
+        localDateString: format(postData.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss')
+      })
+      
       const postRef = await createPost(postData)
       
       // Save PRs to Firestore
@@ -461,11 +573,21 @@ export default function RecordScreen() {
         toast.success("ワークアウトを投稿しました！")
       }
       
-      // Reset state
+      // Reset state and mode
       finishWorkoutContext()
       setShowPostDialog(false)
       setPostComment("")
       setSelectedPhotos([])
+      
+      // カレンダーを更新（新しい記録を反映）
+      setCalendarRefreshTrigger(Date.now())
+      
+      // 記録モードをリセット（手動モードの場合はライブモードに戻る）
+      if (recordMode === 'manual') {
+        setRecordMode('live')
+        setRecordDate('')
+        setManualTimeInput({ startTime: '', endTime: '' })
+      }
 
     } catch (error) {
       console.error('Error posting workout:', error)
@@ -480,21 +602,69 @@ export default function RecordScreen() {
     return (
       <div className="max-w-2xl mx-auto p-4 pb-24">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">ワークアウト中</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">ワークアウト中</h2>
+            {recordMode === 'manual' && recordDate && (
+              <p className="text-sm text-gray-600 mt-1">
+                記録日: {recordDate}
+              </p>
+            )}
+          </div>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-red-600">
-              <Clock className="w-5 h-5" />
-              <span className="font-medium font-mono text-lg">{workoutDuration}</span>
-            </div>
+            {recordMode === 'live' ? (
+              // ライブ記録モード: ストップウォッチ表示
+              <>
+                <div className="flex items-center space-x-2 text-red-600">
+                  <Clock className="w-5 h-5" />
+                  <span className="font-medium font-mono text-lg">{workoutDuration}</span>
+                </div>
+                <Button 
+                  onClick={() => setShowTimerDialog(true)} 
+                  variant="outline"
+                  size="sm"
+                >
+                  <Clock className="w-4 h-4 mr-1" />
+                  タイマー
+                </Button>
+              </>
+            ) : (
+              // 手動記録モード: 時間入力フォーム
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="startTime" className="text-sm text-gray-600">開始:</Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={manualTimeInput.startTime}
+                    onChange={(e) => setManualTimeInput(prev => ({ ...prev, startTime: e.target.value }))}
+                    className="w-24"
+                    size="sm"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="endTime" className="text-sm text-gray-600">終了:</Label>
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={manualTimeInput.endTime}
+                    onChange={(e) => setManualTimeInput(prev => ({ ...prev, endTime: e.target.value }))}
+                    className="w-24"
+                    size="sm"
+                  />
+                </div>
+                {isValidManualTime() && (
+                  <div className="flex items-center space-x-2 text-blue-600">
+                    <Clock className="w-4 h-4" />
+                    <span className="font-medium text-sm">{calculateManualDuration()}分</span>
+                  </div>
+                )}
+              </div>
+            )}
             <Button 
-              onClick={() => setShowTimerDialog(true)} 
-              variant="outline"
-              size="sm"
+              onClick={finishWorkout} 
+              disabled={recordMode === 'manual' && !isValidManualTime()}
+              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-300"
             >
-              <Clock className="w-4 h-4 mr-1" />
-              タイマー
-            </Button>
-            <Button onClick={finishWorkout} className="bg-red-600 hover:bg-red-700">
               完了
             </Button>
           </div>
@@ -777,7 +947,17 @@ export default function RecordScreen() {
   return (
     <div className="max-w-2xl mx-auto p-4">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">ワークアウト記録</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">ワークアウト記録</h2>
+          <div className="flex items-center space-x-3 mt-2">
+            <Badge variant={recordMode === 'live' ? "default" : "secondary"} className="text-xs">
+              {recordMode === 'live' ? '🔴 ライブ記録' : '📝 手動記録'}
+            </Badge>
+            {recordMode === 'manual' && recordDate && (
+              <span className="text-sm text-gray-600">対象日: {recordDate}</span>
+            )}
+          </div>
+        </div>
         <div className="flex space-x-2">
           <Button 
             variant="outline"
@@ -797,7 +977,10 @@ export default function RecordScreen() {
         <div className="text-center text-gray-600 mb-4">
           習慣の可視化とモチベーション強化のために、あなたのワークアウト履歴をカレンダーで確認しましょう。
         </div>
-        <WorkoutCalendar />
+        <WorkoutCalendar 
+          onNavigateToRecord={handleCalendarNavigation}
+          refreshTrigger={calendarRefreshTrigger}
+        />
       </div>
       
       {/* Add Group Dialog */}
@@ -909,7 +1092,7 @@ export default function RecordScreen() {
         <DialogContent className="max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle className="text-center text-2xl">
-              🎉 PR達成！ 🎉
+              PR達成！
             </DialogTitle>
           </DialogHeader>
           
@@ -938,7 +1121,6 @@ export default function RecordScreen() {
                           {['3RM', '5RM', '8RM'].includes(pr.prType) && `${pr.weight}kg`}
                         </div>
                       </div>
-                      <div className="text-2xl">🏆</div>
                     </div>
                   </div>
                 )

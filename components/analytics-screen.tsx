@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TrendingUp, Award, Target, Calendar, BarChart3, Trophy, Zap } from "lucide-react"
+import { TrendingUp, Award, Target, Calendar, BarChart3, Zap } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import { ja } from "date-fns/locale"
 import { PRRecord, calculateE1RM, formatE1RM, findBestE1RMSet, getPRBadgeInfo, groupPRsByWeek, formatPRDate, getPRCategory, PR_CATEGORIES } from "@/lib/pr-utils"
 import PRTrendModal from "./PR/PRTrendModal"
 import MuscleGroupAnalysis from "./PR/MuscleGroupAnalysis"
+import EnhancedWeeklyPRs from "./enhanced-weekly-prs"
 
 interface AnalyticsData {
   totalWorkouts: number
@@ -384,61 +385,6 @@ export default function AnalyticsScreen() {
         </Card>
       </div>
 
-      {/* PR Board */}
-      {weeklyPRs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Trophy className="w-5 h-5 text-yellow-600" />
-              <span>今週のPR ({weeklyPRs.length}件)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {weeklyPRs.slice(0, 5).map((pr) => {
-                const badgeInfo = getPRBadgeInfo(pr.prType, pr.improvement || 0)
-                const category = getPRCategory(pr.prType)
-                const categoryInfo = PR_CATEGORIES[category]
-                return (
-                  <div key={pr.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-gray-900">{pr.exerciseName}</span>
-                        <Badge className={`text-xs ${categoryInfo.color}`}>
-                          {categoryInfo.name}
-                        </Badge>
-                        <Badge className={`text-xs ${badgeInfo.color}`}>
-                          <Zap className="w-3 h-3 mr-1" />
-                          {badgeInfo.text}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {pr.prType === 'e1RM' && `e1RM: ${formatE1RM(pr.value)}kg`}
-                        {pr.prType === 'weight_reps' && `${pr.weight}kg × ${pr.reps}回`}
-                        {pr.prType === 'session_volume' && `総重量: ${(pr.value / 1000).toFixed(1)}t`}
-                        {['3RM', '5RM', '8RM'].includes(pr.prType) && `${pr.weight}kg`}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openTrendModal(pr.exerciseName, pr.prType)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                      </Button>
-                      <div className="text-right text-sm text-gray-500">
-                        <div>{formatPRDate(pr.date)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Charts */}
       <Tabs defaultValue="progress" className="space-y-4">
@@ -542,75 +488,80 @@ export default function AnalyticsScreen() {
         </TabsContent>
 
         <TabsContent value="prs" className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            {allPRs.length > 0 ? (
-              groupPRsByWeek(allPRs).slice(0, 8).map((weekPRs, weekIndex) => (
-                <Card key={weekIndex}>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {formatPRDate(weekPRs[0].date)}の週 ({weekPRs.length}件のPR)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {weekPRs.map((pr) => {
-                        const badgeInfo = getPRBadgeInfo(pr.prType, pr.improvement || 0)
-                        const category = getPRCategory(pr.prType)
-                        const categoryInfo = PR_CATEGORIES[category]
-                        return (
-                          <div key={pr.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                            <div className="flex-1">
+          {/* 今週のPR - 改善版 */}
+          <EnhancedWeeklyPRs 
+            weeklyPRs={weeklyPRs} 
+            onTrendClick={openTrendModal} 
+          />
+          
+          {/* 過去のPR履歴 */}
+          {allPRs.length > weeklyPRs.length && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 mt-8">過去のPR履歴</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {groupPRsByWeek(allPRs.filter(pr => !weeklyPRs.find(wpr => wpr.id === pr.id)))
+                  .slice(0, 4).map((weekPRs, weekIndex) => (
+                  <Card key={weekIndex}>
+                    <CardHeader>
+                      <CardTitle className="text-base">
+                        {formatPRDate(weekPRs[0].date)}の週 ({weekPRs.length}件のPR)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {weekPRs.slice(0, 3).map((pr) => {
+                          const badgeInfo = getPRBadgeInfo(pr.prType, pr.improvement || 0)
+                          const category = getPRCategory(pr.prType)
+                          const categoryInfo = PR_CATEGORIES[category]
+                          return (
+                            <div key={pr.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium text-sm">{pr.exerciseName}</span>
+                                  <Badge className={`text-xs ${categoryInfo.color}`}>
+                                    {categoryInfo.name}
+                                  </Badge>
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
+                                  {pr.prType === 'e1RM' && `e1RM ${formatE1RM(pr.value)}kg`}
+                                  {pr.prType === 'weight_reps' && `${pr.weight}kg × ${pr.reps}回`}
+                                  {pr.prType === 'session_volume' && `総重量 ${(pr.value / 1000).toFixed(1)}t`}
+                                  {['3RM', '5RM', '8RM'].includes(pr.prType) && `${pr.prType} ${pr.weight}kg`}
+                                </div>
+                              </div>
                               <div className="flex items-center space-x-2">
-                                <span className="font-medium text-sm">{pr.exerciseName}</span>
-                                <Badge className={`text-xs ${categoryInfo.color}`}>
-                                  {categoryInfo.name}
-                                </Badge>
-                                <Badge className={`text-xs ${badgeInfo.color}`}>
-                                  {pr.prType === 'e1RM' ? 'e1RM' : pr.prType === 'weight_reps' ? '重量×回数' : pr.prType}
-                                </Badge>
-                              </div>
-                              <div className="text-xs text-gray-600 mt-1">
-                                {pr.prType === 'e1RM' && `${formatE1RM(pr.value)}kg`}
-                                {pr.prType === 'weight_reps' && `${pr.weight}kg × ${pr.reps}回`}
-                                {pr.prType === 'session_volume' && `${(pr.value / 1000).toFixed(1)}t`}
-                                {['3RM', '5RM', '8RM'].includes(pr.prType) && `${pr.weight}kg`}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openTrendModal(pr.exerciseName, pr.prType)}
-                                className="h-6 w-6 p-0"
-                              >
-                                <BarChart3 className="w-3 h-3" />
-                              </Button>
-                              <div className="text-right">
-                                <div className="text-xs text-green-600 font-medium">
-                                  {pr.improvement && pr.improvement > 0 ? `+${pr.improvement}%` : ''}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {formatPRDate(pr.date)}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openTrendModal(pr.exerciseName, pr.prType)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <BarChart3 className="w-3 h-3" />
+                                </Button>
+                                <div className="text-right">
+                                  <div className="text-xs text-green-600 font-medium">
+                                    {pr.improvement && pr.improvement > 0 ? `+${pr.improvement.toFixed(1)}%` : ''}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {formatPRDate(pr.date)}
+                                  </div>
                                 </div>
                               </div>
                             </div>
+                          )
+                        })}
+                        {weekPRs.length > 3 && (
+                          <div className="text-center py-2">
+                            <span className="text-xs text-gray-500">他{weekPRs.length - 3}件</span>
                           </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <Trophy className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                  <h2 className="text-xl font-semibold text-gray-700 mb-2">まだPRがありません</h2>
-                  <p className="text-gray-500">ワークアウトを記録してPRを達成しましょう！</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="muscle-groups" className="space-y-4">

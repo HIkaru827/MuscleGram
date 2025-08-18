@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { BarChart3, TrendingUp, Trophy, Target } from "lucide-react"
+import { BarChart3, TrendingUp, Target } from "lucide-react"
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { getBestPRsByMuscleGroup, getPRAchievementFrequency } from "@/lib/firestore"
 import { PRRecord, getMuscleGroupFromExercise, getPRCategory, PR_CATEGORIES, formatE1RM } from "@/lib/pr-utils"
@@ -113,7 +113,6 @@ export default function MuscleGroupAnalysis({ onTrendClick }: MuscleGroupAnalysi
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <Trophy className="w-16 h-16 mx-auto text-gray-400 mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">部位別データがありません</h3>
           <p className="text-gray-500">ワークアウトを記録して部位別分析を確認しましょう！</p>
         </CardContent>

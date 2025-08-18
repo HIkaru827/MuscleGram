@@ -65,12 +65,13 @@ export const getUser = async (uid: string): Promise<User | null> => {
 }
 
 // Posts
-export const createPost = async (postData: Omit<WorkoutPost, 'id' | 'createdAt' | 'updatedAt'>) => {
+export const createPost = async (postData: Omit<WorkoutPost, 'id' | 'updatedAt'>) => {
   try {
     const postsRef = collection(db, COLLECTIONS.POSTS)
     const docRef = await addDoc(postsRef, {
       ...postData,
-      createdAt: serverTimestamp(),
+      // createdAtが既に設定されている場合はそれを使用、そうでなければserverTimestamp()
+      createdAt: postData.createdAt || serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
 

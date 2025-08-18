@@ -36,7 +36,7 @@ export default function PRRecommendationModal({
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center space-x-2">
             <TrendingUp className="w-6 h-6 text-green-600" />
-            <span>🎯 次の目標設定</span>
+            <span>次の目標設定</span>
           </DialogTitle>
         </DialogHeader>
         

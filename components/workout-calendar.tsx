@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronLeft, ChevronRight, Trophy, Zap, Target, Flame } from "lucide-react"
+import { ChevronLeft, ChevronRight, Zap, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +48,8 @@ interface WorkoutDay {
 
 interface WorkoutCalendarProps {
   onDateSelect?: (date: Date, workouts: WorkoutDay['workouts']) => void
+  onNavigateToRecord?: (date: Date, isToday: boolean) => void
+  refreshTrigger?: number // 外部からリフレッシュをトリガーするためのプロパティ
 }
 
 const muscleGroupColors = {
@@ -168,7 +170,7 @@ const createDemoWorkoutData = (): WorkoutDay[] => {
   })
 }
 
-export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refreshTrigger }: WorkoutCalendarProps) {
   const { user } = useAuth()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([])
@@ -182,6 +184,14 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
       loadWorkoutData()
     }
   }, [user, currentMonth])
+
+  // refreshTriggerが変更された時にデータを再読み込み
+  useEffect(() => {
+    if (user && refreshTrigger) {
+      console.log('Calendar refresh triggered:', refreshTrigger)
+      loadWorkoutData()
+    }
+  }, [refreshTrigger])
 
   const loadWorkoutData = async () => {
     if (!user) return
@@ -232,6 +242,15 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
         const postDate = post.createdAt.toDate ? post.createdAt.toDate() : new Date(post.createdAt)
         const dateKey = format(postDate, 'yyyy-MM-dd')
         
+        console.log('Processing post:', {
+          postId: post.id,
+          createdAt: post.createdAt,
+          postDate,
+          dateKey,
+          recordMode: post.recordMode,
+          recordDate: post.recordDate
+        })
+        
         if (workoutMap.has(dateKey)) {
           const muscleGroups = [...new Set(
             post.exercises.map(ex => getMuscleGroupFromExercise(ex.name))
@@ -278,11 +297,20 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
 
   const handleDateClick = (date: Date) => {
     const dayData = workoutDays.find(day => isSameDay(day.date, date))
-    if (dayData && dayData.workouts.length > 0) {
+    const hasWorkouts = dayData && dayData.workouts.length > 0
+    const clickedIsToday = isToday(date)
+    
+    // 既存のワークアウト詳細表示機能
+    if (hasWorkouts) {
       setSelectedDate(date)
       setSelectedWorkouts(dayData.workouts)
       setShowDetailModal(true)
       onDateSelect?.(date, dayData.workouts)
+    }
+    
+    // 新しいナビゲーション機能 - 全ての日付でクリック可能
+    if (onNavigateToRecord) {
+      onNavigateToRecord(date, clickedIsToday)
     }
   }
 
@@ -312,12 +340,13 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
         className={cn(
           "relative p-2 h-20 border border-gray-100 cursor-pointer transition-all duration-200",
           !isCurrentMonth && "text-gray-300 bg-gray-50",
-          isCurrentMonth && "hover:bg-gray-50",
+          isCurrentMonth && "hover:bg-gray-50 hover:shadow-sm",
           hasWorkout && isCurrentMonth && volumeColor,
           hasWorkout && "hover:shadow-md",
           isToday && "ring-2 ring-red-500 ring-inset"
         )}
         onClick={() => handleDateClick(date)}
+        title={hasWorkout ? `${format(date, 'M月d日')} - ワークアウト詳細を表示 / 記録画面へ` : `${format(date, 'M月d日')} - 記録画面へ`}
       >
         {/* Date number */}
         <div className={cn(
@@ -351,7 +380,7 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
             <div className="flex flex-wrap gap-1">
               {hasPR && (
                 <div className="flex items-center">
-                  <Trophy className="w-3 h-3 text-yellow-600" />
+                  <div className="w-2 h-2 bg-yellow-600 rounded-full" />
                   <span className="text-xs font-bold text-yellow-700 ml-0.5">
                     {dayData.prs.length}
                   </span>
@@ -359,7 +388,7 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
               )}
               {streak >= 3 && (
                 <div className="flex items-center">
-                  <Flame className="w-3 h-3 text-orange-500" />
+                  <div className="w-2 h-2 bg-orange-500 rounded-full" />
                   <span className="text-xs font-bold text-orange-700 ml-0.5">
                     {streak}
                   </span>
@@ -418,11 +447,11 @@ export default function WorkoutCalendar({ onDateSelect }: WorkoutCalendarProps) 
           {/* Legend */}
           <div className="flex items-center justify-center space-x-4 mb-4 text-xs text-gray-600">
             <div className="flex items-center space-x-1">
-              <Trophy className="w-3 h-3 text-yellow-600" />
+              <div className="w-3 h-3 bg-yellow-600 rounded-full" />
               <span>PR達成</span>
             </div>
             <div className="flex items-center space-x-1">
-              <Flame className="w-3 h-3 text-orange-500" />
+              <div className="w-3 h-3 bg-orange-500 rounded-full" />
               <span>連続日数</span>
             </div>
             <div className="flex items-center space-x-1">
