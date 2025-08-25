@@ -338,7 +338,7 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
       <div
         key={format(date, 'yyyy-MM-dd')}
         className={cn(
-          "relative p-2 h-20 border border-gray-100 cursor-pointer transition-all duration-200",
+          "relative p-1.5 h-12 sm:h-16 border border-gray-100 cursor-pointer transition-all duration-200",
           !isCurrentMonth && "text-gray-300 bg-gray-50",
           isCurrentMonth && "hover:bg-gray-50 hover:shadow-sm",
           hasWorkout && isCurrentMonth && volumeColor,
@@ -350,7 +350,7 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
       >
         {/* Date number */}
         <div className={cn(
-          "text-sm font-medium",
+          "text-xs sm:text-sm font-medium",
           isToday && "text-red-600 font-bold",
           !isCurrentMonth && "text-gray-400"
         )}>
@@ -359,42 +359,32 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
         
         {/* Workout indicators */}
         {hasWorkout && isCurrentMonth && (
-          <div className="absolute inset-2 top-6 flex flex-col space-y-1">
+          <div className="absolute inset-1 top-4 sm:top-5 flex flex-col space-y-0.5">
             {/* Muscle group indicators */}
-            <div className="flex flex-wrap gap-1">
-              {uniqueMuscleGroups.slice(0, 3).map((muscleGroup) => (
+            <div className="flex flex-wrap gap-0.5">
+              {uniqueMuscleGroups.slice(0, 4).map((muscleGroup) => (
                 <div
                   key={muscleGroup}
                   className={cn(
-                    "w-2 h-2 rounded-full text-xs",
+                    "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full",
                     muscleGroupColors[muscleGroup as keyof typeof muscleGroupColors] || 'bg-gray-300'
                   )}
                 />
               ))}
-              {uniqueMuscleGroups.length > 3 && (
-                <div className="w-2 h-2 rounded-full bg-gray-400" />
+              {uniqueMuscleGroups.length > 4 && (
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400" />
               )}
             </div>
             
             {/* Badges */}
-            <div className="flex flex-wrap gap-1">
-              {hasPR && (
-                <div className="flex items-center">
-                  <div className="w-2 h-2 bg-yellow-600 rounded-full" />
-                  <span className="text-xs font-bold text-yellow-700 ml-0.5">
-                    {dayData.prs.length}
-                  </span>
-                </div>
-              )}
-              {streak >= 3 && (
-                <div className="flex items-center">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                  <span className="text-xs font-bold text-orange-700 ml-0.5">
-                    {streak}
-                  </span>
-                </div>
-              )}
-            </div>
+            {hasPR && (
+              <div className="flex items-center">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-600 rounded-full" />
+                <span className="text-xs font-bold text-yellow-700 ml-0.5 hidden sm:inline">
+                  {dayData.prs.length}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -449,10 +439,6 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-yellow-600 rounded-full" />
               <span>PR達成</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-orange-500 rounded-full" />
-              <span>連続日数</span>
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-red-300 rounded-full" />

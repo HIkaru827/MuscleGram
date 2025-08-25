@@ -31,7 +31,7 @@ interface AnalyticsData {
 export default function AnalyticsScreen() {
   const { user } = useAuth()
   const [selectedExercise, setSelectedExercise] = useState("all")
-  const [timeRange, setTimeRange] = useState("6months")
+  const [timeRange, setTimeRange] = useState("1month")
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [weeklyPRs, setWeeklyPRs] = useState<PRRecord[]>([])

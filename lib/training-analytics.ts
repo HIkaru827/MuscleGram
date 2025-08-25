@@ -49,22 +49,35 @@ export const getLastTrainingDate = async (
   exercise: string
 ): Promise<Date | null> => {
   try {
-    const recordsRef = collection(db, `users/${userId}/records`)
+    // Query workout_posts instead of users/{userId}/records
+    const postsRef = collection(db, 'workout_posts')
     const q = query(
-      recordsRef,
-      where('exercise', '==', exercise),
-      orderBy('date', 'desc'),
-      limit(1)
+      postsRef,
+      where('userId', '==', userId)
     )
     
     const querySnapshot = await getDocs(q)
     
-    if (!querySnapshot.empty) {
-      const lastRecord = querySnapshot.docs[0].data()
-      return parseISO(lastRecord.date)
-    }
+    // Filter posts that contain the specific exercise and find the most recent date
+    let latestDate: Date | null = null
     
-    return null
+    querySnapshot.forEach((doc) => {
+      const postData = doc.data()
+      const hasExercise = postData.exercises?.some((ex: any) => ex.name === exercise)
+      
+      if (hasExercise) {
+        // Get the workout date (either recordDate for manual records or createdAt for live records)
+        const workoutDate = postData.recordDate 
+          ? parseISO(postData.recordDate)
+          : postData.createdAt?.toDate ? postData.createdAt.toDate() : new Date()
+        
+        if (!latestDate || workoutDate > latestDate) {
+          latestDate = workoutDate
+        }
+      }
+    })
+    
+    return latestDate
   } catch (error) {
     console.error('Error fetching last training date:', error)
     return null
@@ -104,26 +117,41 @@ export const calculateConsistency = async (
   exercise: string
 ): Promise<NextRecommendation['consistency']> => {
   try {
-    const recordsRef = collection(db, `users/${userId}/records`)
+    // Query workout_posts instead of users/{userId}/records
+    const postsRef = collection(db, 'workout_posts')
     const q = query(
-      recordsRef,
-      where('exercise', '==', exercise),
-      orderBy('date', 'asc')
+      postsRef,
+      where('userId', '==', userId)
     )
     
     const querySnapshot = await getDocs(q)
     
-    if (querySnapshot.docs.length < 3) return 'low'
-    
-    // Calculate intervals between training sessions
-    const dates: Date[] = []
-    querySnapshot.forEach(doc => {
-      dates.push(parseISO(doc.data().date))
+    // Filter posts that contain this specific exercise and extract workout dates
+    const exerciseDates: Date[] = []
+    querySnapshot.forEach((doc) => {
+      const postData = doc.data()
+      const hasExercise = postData.exercises?.some((ex: any) => ex.name === exercise)
+      
+      if (hasExercise) {
+        // Get the workout date (either recordDate for manual records or createdAt for live records)
+        const workoutDate = postData.recordDate 
+          ? parseISO(postData.recordDate)
+          : postData.createdAt?.toDate ? postData.createdAt.toDate() : new Date()
+        exerciseDates.push(workoutDate)
+      }
     })
     
+    // Sort dates and remove duplicates
+    const uniqueDates = [...new Set(exerciseDates.map(date => date.toISOString().split('T')[0]))]
+      .sort()
+      .map(dateStr => parseISO(dateStr))
+    
+    if (uniqueDates.length < 3) return 'low'
+    
+    // Calculate intervals between training sessions
     const intervals: number[] = []
-    for (let i = 1; i < dates.length; i++) {
-      intervals.push(differenceInDays(dates[i], dates[i - 1]))
+    for (let i = 1; i < uniqueDates.length; i++) {
+      intervals.push(differenceInDays(uniqueDates[i], uniqueDates[i - 1]))
     }
     
     // Calculate standard deviation
@@ -193,23 +221,58 @@ export const getAllTrainingRecommendations = async (
   userId: string
 ): Promise<NextRecommendation[]> => {
   try {
+    console.log('Getting training recommendations for user:', userId)
+    
     // Get all analytics documents for the user
     const analyticsRef = collection(db, `users/${userId}/analytics`)
     const analyticsSnapshot = await getDocs(analyticsRef)
     
-    if (analyticsSnapshot.empty) return []
+    console.log('Analytics snapshot:', {
+      empty: analyticsSnapshot.empty,
+      size: analyticsSnapshot.size,
+      docs: analyticsSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
+    })
+    
+    if (analyticsSnapshot.empty) {
+      console.log('No analytics data found for user:', userId)
+      
+      // Also check if we have any workout posts for this user
+      const postsRef = collection(db, 'workout_posts')
+      const q = query(postsRef, where('userId', '==', userId))
+      const postsSnapshot = await getDocs(q)
+      
+      console.log('Workout posts for user:', {
+        empty: postsSnapshot.empty,
+        size: postsSnapshot.size,
+        docs: postsSnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          userId: doc.data().userId,
+          exercises: doc.data().exercises?.map(ex => ex.name) || [],
+          createdAt: doc.data().createdAt,
+          recordDate: doc.data().recordDate
+        }))
+      })
+      
+      return []
+    }
     
     const recommendations: NextRecommendation[] = []
     
     // Process each exercise
     for (const analyticsDoc of analyticsSnapshot.docs) {
       const exercise = analyticsDoc.id
+      console.log(`Processing recommendation for exercise: ${exercise}`)
+      
       const recommendation = await getNextTrainingRecommendation(userId, exercise)
+      
+      console.log(`Recommendation result for ${exercise}:`, recommendation)
       
       if (recommendation) {
         recommendations.push(recommendation)
       }
     }
+    
+    console.log(`Final recommendations count: ${recommendations.length}`)
     
     // Sort by urgency (overdue first, then due soon)
     return recommendations.sort((a, b) => {

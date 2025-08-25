@@ -266,7 +266,7 @@ export default function EnhancedWeeklyPRs({ weeklyPRs, onTrendClick }: EnhancedW
         const sectionDate = new Date(today.getTime() - i * 24 * 60 * 60 * 1000)
         dateSections.push({
           date: sectionDate,
-          label: `${i}日前`,
+          label: format(sectionDate, 'M月d日', { locale: ja }),
           prs: sections.get(key)!.sort((a, b) => getPRPriority(b.mainPR) - getPRPriority(a.mainPR))
         })
       }
