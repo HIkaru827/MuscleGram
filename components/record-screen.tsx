@@ -950,9 +950,11 @@ export default function RecordScreen() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">ワークアウト記録</h2>
           <div className="flex items-center space-x-3 mt-2">
-            <Badge variant={recordMode === 'live' ? "default" : "secondary"} className="text-xs">
-              {recordMode === 'live' ? '🔴 ライブ記録' : '📝 手動記録'}
-            </Badge>
+            {recordMode === 'manual' && (
+              <Badge variant="secondary" className="text-xs">
+                📝 手動記録
+              </Badge>
+            )}
             {recordMode === 'manual' && recordDate && (
               <span className="text-sm text-gray-600">対象日: {recordDate}</span>
             )}
