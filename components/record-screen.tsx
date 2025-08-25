@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -190,6 +190,17 @@ export default function RecordScreen() {
     setManualTimeInput({ startTime: '', endTime: '' })
   }, [])
 
+  // ワークアウト状態の変化を監視して適切にタイマーを制御
+  const [prevWorkoutActive, setPrevWorkoutActive] = useState(isWorkoutActive)
+  
+  useEffect(() => {
+    // ワークアウトが終了した場合（アクティブ→非アクティブ）のみタイマーを閉じる
+    if (prevWorkoutActive && !isWorkoutActive) {
+      setShowTimerDialog(false)
+    }
+    setPrevWorkoutActive(isWorkoutActive)
+  }, [isWorkoutActive, prevWorkoutActive])
+
   // Load muscle groups from localStorage or use defaults
   useEffect(() => {
     const savedGroups = localStorage.getItem('muscleGroups')
@@ -337,6 +348,9 @@ export default function RecordScreen() {
 
 
   const finishWorkout = () => {
+    // 完了時にタイマーダイアログを閉じる
+    setShowTimerDialog(false)
+    
     if (currentWorkout.length > 0) {
       setShowPostDialog(true)
     } else {
@@ -576,8 +590,14 @@ export default function RecordScreen() {
       // Reset state and mode
       finishWorkoutContext()
       setShowPostDialog(false)
+      setShowTimerDialog(false)
       setPostComment("")
       setSelectedPhotos([])
+      
+      // Force reset timer dialog state - ensure it's truly closed
+      setTimeout(() => {
+        setShowTimerDialog(false)
+      }, 100)
       
       // カレンダーを更新（新しい記録を反映）
       setCalendarRefreshTrigger(Date.now())
@@ -658,6 +678,14 @@ export default function RecordScreen() {
                     <span className="font-medium text-sm">{calculateManualDuration()}分</span>
                   </div>
                 )}
+                <Button 
+                  onClick={() => setShowTimerDialog(true)} 
+                  variant="outline"
+                  size="sm"
+                >
+                  <Clock className="w-4 h-4 mr-1" />
+                  タイマー
+                </Button>
               </div>
             )}
             <Button 
@@ -847,6 +875,9 @@ export default function RecordScreen() {
           <DialogContent className="max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle>ワークアウトを投稿</DialogTitle>
+              <DialogDescription>
+                今回のワークアウト記録をコミュニティに投稿します
+              </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4">
@@ -1096,6 +1127,9 @@ export default function RecordScreen() {
             <DialogTitle className="text-center text-2xl">
               PR達成！
             </DialogTitle>
+            <DialogDescription className="text-center">
+              おめでとうございます！新しい個人記録を達成しました
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">

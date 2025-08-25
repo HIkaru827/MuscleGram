@@ -1,6 +1,6 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Target, TrendingUp } from "lucide-react"
@@ -38,6 +38,9 @@ export default function PRRecommendationModal({
             <TrendingUp className="w-6 h-6 text-green-600" />
             <span>次の目標設定</span>
           </DialogTitle>
+          <DialogDescription className="text-center">
+            達成したPRを基に次の目標を提案します
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">

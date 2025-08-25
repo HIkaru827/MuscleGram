@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Clock, Play, Pause, RotateCcw } from 'lucide-react'
@@ -21,6 +21,14 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
   const [remainingSeconds, setRemainingSeconds] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null)
+
+  // Only cleanup intervals when dialog closes, but preserve timer state
+  useEffect(() => {
+    if (!isOpen && timerId) {
+      clearInterval(timerId)
+      setTimerId(null)
+    }
+  }, [isOpen, timerId])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -101,6 +109,9 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
             <Clock className="w-5 h-5" />
             休憩タイマー
           </DialogTitle>
+          <DialogDescription>
+            セット間の休憩時間を管理するためのタイマーです。
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">

@@ -127,8 +127,14 @@ export default function AnalyticsScreen() {
           post.createdAt && isAfter(post.createdAt.toDate(), startDate)
         )
 
-        // Calculate analytics
-        const totalWorkouts = filteredPosts.length
+        // Calculate analytics - count unique workout days
+        const workoutDays = new Set<string>()
+        filteredPosts.forEach(post => {
+          if (post.createdAt) {
+            workoutDays.add(format(post.createdAt.toDate(), 'yyyy-MM-dd'))
+          }
+        })
+        const totalWorkouts = workoutDays.size
         
         // Calculate total volume (weight × reps for all sets)
         const totalVolume = filteredPosts.reduce((sum, post) => {
@@ -171,9 +177,9 @@ export default function AnalyticsScreen() {
           .sort((a, b) => b.count - a.count)
           .slice(0, 5)
 
-        // Create progress data grouped by week/month
+        // Create progress data grouped by week/month, counting unique days only
         const progressData: { date: string; volume: number; workouts: number }[] = []
-        const groupedData: Record<string, { volume: number; workouts: number }> = {}
+        const groupedData: Record<string, { volume: number; workoutDays: Set<string> }> = {}
 
         filteredPosts.forEach(post => {
           if (!post.createdAt) return
@@ -182,9 +188,12 @@ export default function AnalyticsScreen() {
           const groupKey = timeRange === "1month" 
             ? format(startOfWeek(postDate), 'MM/dd', { locale: ja })
             : format(startOfMonth(postDate), 'MM月', { locale: ja })
+          
+          // Use date string as unique day identifier
+          const dayKey = format(postDate, 'yyyy-MM-dd')
 
           if (!groupedData[groupKey]) {
-            groupedData[groupKey] = { volume: 0, workouts: 0 }
+            groupedData[groupKey] = { volume: 0, workoutDays: new Set<string>() }
           }
 
           const postVolume = post.exercises.reduce((sum, exercise) => {
@@ -192,11 +201,15 @@ export default function AnalyticsScreen() {
           }, 0)
 
           groupedData[groupKey].volume += postVolume
-          groupedData[groupKey].workouts += 1
+          groupedData[groupKey].workoutDays.add(dayKey)
         })
 
         Object.entries(groupedData).forEach(([date, data]) => {
-          progressData.push({ date, ...data })
+          progressData.push({ 
+            date, 
+            volume: data.volume, 
+            workouts: data.workoutDays.size 
+          })
         })
 
         // Create exercise-specific progress data
@@ -406,7 +419,7 @@ export default function AnalyticsScreen() {
                 <BarChart data={analyticsData.progressData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
-                  <YAxis />
+                  <YAxis domain={[0, timeRange === "1month" ? 7 : 30]} />
                   <Tooltip />
                   <Bar dataKey="workouts" fill="#dc2626" />
                 </BarChart>
