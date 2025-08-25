@@ -8,17 +8,27 @@ import PWAInstallPrompt from "@/components/pwa-install"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "MuscleGram - 筋トレSNSアプリ",
-  description: "筋力トレーニングに特化したソーシャルネットワークアプリケーション",
+  description: "筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート、他のユーザーとの交流であなたのワークアウトを強力にサポート！",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "MuscleGram",
   },
-    generator: 'v0.dev'
-}
+  generator: 'Vercel', // Vercelは自動で追加するため、もしあれば削除またはVercelに設定
+  
+  // ここからOGP設定を追加！
+  openGraph: {
+    title: "MuscleGram - 筋トレSNSアプリ",
+    description: "筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート、他のユーザーとの交流であなたのワークアウトを強力にサポート！",
+    url: "https://musclegram.net",
+    siteName: "MuscleGram",
+    locale: "ja_JP",
+    type: "website",
+  },
+};
 
 export function generateViewport() {
   return {
