@@ -25,11 +25,18 @@ export const metadata = {
     description: "筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート、他のユーザーとの交流であなたのワークアウトを強力にサポート！",
     url: "https://musclegram.net",
     siteName: "MuscleGram",
+    images: [
+      {
+        url: '/app_logo.png', // OGP用の画像URL
+        width: 1200,
+        height: 630,
+        alt: 'MuscleGram - 筋トレSNSアプリ',
+      },
+    ],
     locale: "ja_JP",
     type: "website",
   },
 };
-
 export function generateViewport() {
   return {
     width: 'device-width',
