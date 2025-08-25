@@ -36,23 +36,34 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
 
   // Load saved workout state from localStorage on mount
   useEffect(() => {
-    const savedWorkoutState = localStorage.getItem('workoutState')
-    if (savedWorkoutState) {
-      const state = JSON.parse(savedWorkoutState)
-      setIsWorkoutActive(state.isWorkoutActive)
-      setWorkoutStartTime(state.workoutStartTime ? new Date(state.workoutStartTime) : null)
-      setCurrentWorkout(state.currentWorkout || [])
+    // Only access localStorage in the browser
+    if (typeof window !== 'undefined') {
+      const savedWorkoutState = localStorage.getItem('workoutState')
+      if (savedWorkoutState) {
+        try {
+          const state = JSON.parse(savedWorkoutState)
+          setIsWorkoutActive(state.isWorkoutActive)
+          setWorkoutStartTime(state.workoutStartTime ? new Date(state.workoutStartTime) : null)
+          setCurrentWorkout(state.currentWorkout || [])
+        } catch (error) {
+          console.error('Error loading workout state:', error)
+          localStorage.removeItem('workoutState')
+        }
+      }
     }
   }, [])
 
   // Save workout state to localStorage whenever it changes
   useEffect(() => {
-    const state = {
-      isWorkoutActive,
-      workoutStartTime: workoutStartTime?.getTime() || null,
-      currentWorkout
+    // Only save to localStorage in the browser
+    if (typeof window !== 'undefined') {
+      const state = {
+        isWorkoutActive,
+        workoutStartTime: workoutStartTime?.getTime() || null,
+        currentWorkout
+      }
+      localStorage.setItem('workoutState', JSON.stringify(state))
     }
-    localStorage.setItem('workoutState', JSON.stringify(state))
   }, [isWorkoutActive, workoutStartTime, currentWorkout])
 
   // Update current time every second when workout is active
@@ -92,7 +103,10 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     setIsWorkoutActive(false)
     setWorkoutStartTime(null)
     setCurrentWorkout([])
-    localStorage.removeItem('workoutState')
+    // Only remove from localStorage in the browser
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('workoutState')
+    }
   }
 
   const addExerciseToWorkout = (exerciseId: string, exerciseName: string, lastPerformed?: { weight: number; reps: number }) => {

@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/AuthContext"
+import { WorkoutProvider } from "@/contexts/WorkoutContext"
 import PWAInstallPrompt from "@/components/pwa-install"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -44,8 +45,10 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <AuthProvider>
-          {children}
-          <PWAInstallPrompt />
+          <WorkoutProvider>
+            {children}
+            <PWAInstallPrompt />
+          </WorkoutProvider>
         </AuthProvider>
       </body>
     </html>
