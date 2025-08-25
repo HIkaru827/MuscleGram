@@ -64,6 +64,41 @@ export const getUser = async (uid: string): Promise<User | null> => {
   }
 }
 
+// Get public profile (without sensitive information like email)
+export const getPublicUserProfile = async (uid: string, currentUserId?: string): Promise<User | null> => {
+  try {
+    const userRef = doc(db, COLLECTIONS.USERS, uid)
+    const userSnap = await getDoc(userRef)
+    
+    if (userSnap.exists()) {
+      const userData = userSnap.data() as User
+      
+      // If it's the current user, return all data
+      if (currentUserId === uid) {
+        return { uid, ...userData }
+      }
+      
+      // For other users, exclude sensitive information
+      const publicData = {
+        uid,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        bio: userData.bio,
+        followers: userData.followers,
+        following: userData.following,
+        postsCount: userData.postsCount,
+        // Exclude email, createdAt, updatedAt for privacy
+      }
+      
+      return publicData as User
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting public user profile:', error)
+    throw error
+  }
+}
+
 // Posts
 export const createPost = async (postData: Omit<WorkoutPost, 'id' | 'updatedAt'>) => {
   try {

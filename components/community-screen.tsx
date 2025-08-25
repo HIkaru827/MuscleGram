@@ -43,7 +43,19 @@ export default function CommunityScreen() {
         const users: User[] = []
         usersSnapshot.forEach((doc) => {
           if (doc.id !== user.uid) { // Exclude current user
-            users.push({ uid: doc.id, ...doc.data() } as User)
+            const userData = doc.data() as User
+            // Only include public profile data, exclude email and sensitive info
+            const publicProfile: User = {
+              uid: doc.id,
+              displayName: userData.displayName,
+              photoURL: userData.photoURL,
+              bio: userData.bio,
+              followers: userData.followers || 0,
+              following: userData.following || 0,
+              postsCount: userData.postsCount || 0,
+              // Exclude email, createdAt, updatedAt
+            } as User
+            users.push(publicProfile)
           }
         })
 
@@ -121,7 +133,6 @@ export default function CommunityScreen() {
                             新規
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">{member.email}</p>
                         {member.bio && (
                           <p className="text-sm text-gray-500 mt-1 line-clamp-2">{member.bio}</p>
                         )}

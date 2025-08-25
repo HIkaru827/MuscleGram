@@ -3,6 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Allow users to read any user profile data (for community features) but only write their own data
+    // Note: Client-side filtering should hide sensitive data like email addresses from other users
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;

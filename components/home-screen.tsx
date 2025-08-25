@@ -166,13 +166,12 @@ export default function HomeScreen() {
                         <div className="flex items-center space-x-2">
                           <p className="font-semibold text-gray-900">{post.user?.displayName || 'Unknown User'}</p>
                         </div>
-                        <p className="text-gray-500 text-sm">{post.user?.email}</p>
+                        <p className="text-gray-500 text-sm">
+                          {post.createdAt && format(post.createdAt.toDate(), 'MM月dd日', { locale: ja })}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-gray-500 text-sm">
-                        {post.createdAt && format(post.createdAt.toDate(), 'MM/dd HH:mm', { locale: ja })}
-                      </span>
                       {post.userId === user?.uid && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
