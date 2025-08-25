@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Settings, Edit, Users, Award, LogOut, Bell, Shield, Camera, CalendarIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -20,12 +20,15 @@ import { ja } from "date-fns/locale"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { toast } from "sonner"
+import { uploadImage, validateImageFile, compressImage } from "@/lib/storage"
 
 export default function ProfileScreen() {
   const { user, userProfile, logout } = useAuth()
   const [userPosts, setUserPosts] = useState<WorkoutPost[]>([])
   const [loading, setLoading] = useState(true)
   const [editingProfile, setEditingProfile] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [editForm, setEditForm] = useState({
     displayName: "",
     bio: ""
@@ -131,6 +134,42 @@ export default function ProfileScreen() {
     }
   }
 
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    setUploadingPhoto(true)
+
+    try {
+      // Validate file
+      validateImageFile(file)
+
+      // Compress image
+      const compressedFile = await compressImage(file, 400, 0.8)
+
+      // Upload to storage
+      const photoURL = await uploadImage(compressedFile, `profile-photos`)
+
+      // Update user profile in Firestore
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, {
+        photoURL,
+        updatedAt: new Date()
+      })
+
+      toast.success("プロフィール写真を更新しました")
+    } catch (error: any) {
+      console.error('Photo upload error:', error)
+      toast.error(error.message || "写真のアップロードに失敗しました")
+    } finally {
+      setUploadingPhoto(false)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await logout()
@@ -169,12 +208,25 @@ export default function ProfileScreen() {
                   {userProfile.displayName?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
               <Button
                 size="sm"
                 variant="outline"
                 className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
               >
-                <Camera className="h-4 w-4" />
+                {uploadingPhoto ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
               </Button>
             </div>
             
@@ -196,6 +248,33 @@ export default function ProfileScreen() {
                       <DialogTitle>プロフィール編集</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                      <div className="flex flex-col items-center space-y-2">
+                        <Avatar className="w-16 h-16">
+                          <AvatarImage src={userProfile.photoURL || "/placeholder.svg"} alt={userProfile.displayName} />
+                          <AvatarFallback className="bg-red-100 text-red-600 text-lg">
+                            {userProfile.displayName?.[0] || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingPhoto}
+                          className="text-sm"
+                        >
+                          {uploadingPhoto ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-red-600 border-t-transparent mr-2" />
+                              アップロード中...
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-3 w-3 mr-2" />
+                              写真を変更
+                            </>
+                          )}
+                        </Button>
+                      </div>
                       <div>
                         <Label htmlFor="displayName">表示名</Label>
                         <Input

@@ -442,7 +442,7 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-red-300 rounded-full" />
-              <span>負荷量</span>
+              <span>ワークアウト日</span>
             </div>
           </div>
           
