@@ -99,11 +99,11 @@ export default function LoginScreen({ onClose }: LoginScreenProps) {
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 flex items-center justify-center">
+          <div className="mx-auto w-24 h-24 flex items-center justify-center">
             <img 
               src="/app_logo.png" 
               alt="MuscleGram Logo" 
-              className="w-16 h-16 object-contain"
+              className="w-24 h-24 object-contain"
             />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
