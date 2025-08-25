@@ -110,12 +110,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInWithGoogle = async () => {
+    // Check if we're in demo mode
+    const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+    
+    if (isDemoMode) {
+      throw new Error('デモモードではGoogleログインは利用できません。Firebase設定を完了してください。')
+    }
+
     try {
       const provider = new GoogleAuthProvider()
+      // Add additional scopes if needed
+      provider.addScope('email')
+      provider.addScope('profile')
+      
+      // Set custom parameters
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      })
+      
       const result = await signInWithPopup(auth, provider)
       await createUserProfile(result.user)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google sign in error:', error)
+      
+      // More specific error handling
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('ポップアップが閉じられました。再度お試しください。')
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('ポップアップがブロックされています。ブラウザの設定を確認してください。')
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('ネットワークエラーが発生しました。接続を確認してください。')
+      } else if (error.code === 'auth/internal-error') {
+        throw new Error('内部エラーが発生しました。しばらく後に再度お試しください。')
+      } else if (error.code === 'auth/configuration-not-found') {
+        throw new Error('Firebase設定が見つかりません。設定を確認してください。')
+      } else if (error.code === 'auth/invalid-api-key') {
+        throw new Error('無効なAPIキーです。Firebase設定を確認してください。')
+      }
+      
       throw error
     }
   }
