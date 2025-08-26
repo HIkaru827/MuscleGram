@@ -36,8 +36,10 @@ self.addEventListener('fetch', (event) => {
   // Skip service worker for API requests to avoid CORS issues
   if (event.request.url.includes('cloudfunctions.net') || 
       event.request.url.includes('googleapis.com') ||
+      event.request.url.includes('gstatic.com') ||
+      event.request.url.includes('accounts.google.com') ||
+      event.request.url.includes('firebaseio.com') ||
       event.request.url.includes('/api/')) {
-    event.respondWith(fetch(event.request))
     return
   }
 
