@@ -293,7 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Delay Firebase initialization to prioritize initial render
+    // Much shorter delay for faster initialization
     const delayedInit = setTimeout(() => {
       // Check if we're in demo mode or missing environment variables
       const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key' || 
@@ -342,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false)
           setInitialized(true)
         }
-      }, 8000) // 8 second timeout for auth initialization
+      }, 2000) // 2 second timeout for much faster loading
 
       const unsubscribe = auth ? onAuthStateChanged(auth, async (user) => {
         clearTimeout(authTimeout) // Clear timeout if auth state changes
@@ -385,7 +385,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (unsubscribe) unsubscribe()
         clearTimeout(authTimeout) // Clean up auth timeout
       }
-    }, 50) // 50ms delay to allow skeleton render first
+    }, 10) // 10ms delay - minimal delay for faster loading
 
     return () => clearTimeout(delayedInit)
   }, [])

@@ -12,62 +12,12 @@ import dynamic from "next/dynamic"
 import { useDebugger } from "@/lib/debug-utils"
 import { usePerformanceMonitor } from "@/lib/performance-monitor"
 
-// Dynamic imports with chunk error handling
-const HomeScreen = dynamic(() => import('@/components/home-screen').catch(error => {
-  console.error('Failed to load HomeScreen:', error)
-  // Fallback to reload if chunk loading fails
-  if (error.name === 'ChunkLoadError') {
-    window.location.reload()
-  }
-  throw error
-}), {
-  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
-  ssr: false
-})
-
-const RecordScreen = dynamic(() => import('@/components/record-screen').catch(error => {
-  console.error('Failed to load RecordScreen:', error)
-  if (error.name === 'ChunkLoadError') {
-    window.location.reload()
-  }
-  throw error
-}), {
-  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
-  ssr: false
-})
-
-const AnalyticsScreen = dynamic(() => import('@/components/analytics-screen').catch(error => {
-  console.error('Failed to load AnalyticsScreen:', error)
-  if (error.name === 'ChunkLoadError') {
-    window.location.reload()
-  }
-  throw error
-}), {
-  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
-  ssr: false
-})
-
-const CommunityScreen = dynamic(() => import('@/components/community-screen').catch(error => {
-  console.error('Failed to load CommunityScreen:', error)
-  if (error.name === 'ChunkLoadError') {
-    window.location.reload()
-  }
-  throw error
-}), {
-  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
-  ssr: false
-})
-
-const ProfileScreen = dynamic(() => import('@/components/profile-screen').catch(error => {
-  console.error('Failed to load ProfileScreen:', error)
-  if (error.name === 'ChunkLoadError') {
-    window.location.reload()
-  }
-  throw error
-}), {
-  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
-  ssr: false
-})
+// Static imports for faster loading - no chunk loading delays
+import HomeScreen from '@/components/home-screen'
+import RecordScreen from '@/components/record-screen'
+import AnalyticsScreen from '@/components/analytics-screen'  
+import CommunityScreen from '@/components/community-screen'
+import ProfileScreen from '@/components/profile-screen'
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
 
@@ -150,12 +100,12 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   // Handle initial load completion with timeout fallback
   React.useEffect(() => {
     if (!loading) {
-      // Delay to ensure DOM is painted
+      // Minimal delay for much faster loading
       const timer = setTimeout(() => {
         setIsInitialLoad(false)
         markFirstRender()
         logApp('Initial load completed, isInitialLoad set to false')
-      }, 500)
+      }, 100) // 100ms instead of 500ms - much faster
       return () => clearTimeout(timer)
     }
   }, [loading])
@@ -168,7 +118,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
         setAuthTimeout(true)
         setIsInitialLoad(false)
       }
-    }, 10000) // 10 second timeout
+    }, 3000) // 3 second timeout - much faster
 
     return () => clearTimeout(authTimeoutTimer)
   }, [loading, isInitialLoad])
@@ -177,10 +127,10 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   React.useEffect(() => {
     const forceLoadTimer = setTimeout(() => {
       if (isInitialLoad) {
-        logApp('Force completing initial load after 15 seconds')
+        logApp('Force completing initial load after 5 seconds')
         setIsInitialLoad(false)
       }
-    }, 15000) // 15 second force timeout
+    }, 5000) // 5 second force timeout - much faster
 
     return () => clearTimeout(forceLoadTimer)
   }, [])
