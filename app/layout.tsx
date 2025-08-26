@@ -5,21 +5,32 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { WorkoutProvider } from "@/contexts/WorkoutContext"
 import PWAInstallPrompt from "@/components/pwa-install"
+import StructuredData from "@/components/structured-data"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
-  title: "MuscleGram - 筋トレSNSアプリ",
+export const metadata: Metadata = {
+  title: {
+    default: "MuscleGram - 筋トレSNSアプリ",
+    template: "%s | MuscleGram"
+  },
   description: "筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート、他のユーザーとの交流であなたのワークアウトを強力にサポート！",
+  keywords: ["筋トレ", "フィットネス", "ワークアウト", "記録", "分析", "SNS", "筋力トレーニング", "トレーニング記録", "PR記録"],
+  authors: [{ name: "MuscleGram Team" }],
+  creator: "MuscleGram",
+  publisher: "MuscleGram",
+  metadataBase: new URL('https://musclegram.net'),
+  alternates: {
+    canonical: '/',
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "MuscleGram",
   },
-  generator: 'Vercel', // Vercelは自動で追加するため、もしあれば削除またはVercelに設定
   
-  // ここからOGP設定を追加！
   openGraph: {
     title: "MuscleGram - 筋トレSNSアプリ",
     description: "筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート、他のユーザーとの交流であなたのワークアウトを強力にサポート！",
@@ -27,7 +38,7 @@ export const metadata = {
     siteName: "MuscleGram",
     images: [
       {
-        url: '/app_logo.png', // OGP用の画像URL
+        url: '/app_logo.png',
         width: 1200,
         height: 630,
         alt: 'MuscleGram - 筋トレSNSアプリ',
@@ -35,6 +46,25 @@ export const metadata = {
     ],
     locale: "ja_JP",
     type: "website",
+  },
+  
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MuscleGram - 筋トレSNSアプリ',
+    description: '筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート！',
+    images: ['/app_logo.png'],
+  },
+  
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 export function generateViewport() {
@@ -59,12 +89,25 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="MuscleGram" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firebase.googleapis.com" />
+        <style>{`
+          .skeleton-box{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:loading 2s infinite}
+          @keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+          .prevent-cls{min-height:100vh;display:flex;flex-direction:column}
+          .hw-accelerate{transform:translateZ(0);will-change:transform}
+          body{font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+        `}</style>
       </head>
       <body className={inter.className}>
+        <StructuredData />
         <AuthProvider>
           <WorkoutProvider>
             {children}
             <PWAInstallPrompt />
+            <Toaster position="top-center" richColors />
           </WorkoutProvider>
         </AuthProvider>
       </body>

@@ -29,15 +29,17 @@ export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 
-// Initialize Analytics (only in browser and only with valid config)
+// Initialize Analytics lazily
 let analytics: any = null
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key') {
-  try {
-    analytics = getAnalytics(app)
-  } catch (error) {
-    console.warn('Analytics initialization failed:', error)
+export const getAnalyticsInstance = () => {
+  if (typeof window !== 'undefined' && !analytics && process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key') {
+    try {
+      analytics = getAnalytics(app)
+    } catch (error) {
+      console.warn('Analytics initialization failed:', error)
+    }
   }
+  return analytics
 }
-export { analytics }
 
 export default app

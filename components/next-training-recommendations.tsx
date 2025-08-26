@@ -13,6 +13,7 @@ import {
   getStatusColor,
   NextRecommendation 
 } from "@/lib/training-analytics"
+import { NotificationManager } from "@/lib/notification-manager"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 
@@ -45,6 +46,17 @@ export default function NextTrainingRecommendations({
     try {
       const recs = await getAllTrainingRecommendations(user.uid)
       setRecommendations(recs)
+      
+      // Schedule notifications for recommendations
+      const notificationManager = NotificationManager.getInstance()
+      recs.forEach(rec => {
+        if (rec.status === 'due_soon' || rec.status === 'on_track') {
+          notificationManager.scheduleTrainingNotification(
+            rec.exerciseName,
+            rec.nextRecommendedDate
+          )
+        }
+      })
     } catch (error) {
       console.error('Error loading training recommendations:', error)
     } finally {
@@ -130,7 +142,7 @@ export default function NextTrainingRecommendations({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 p-4">
         {displayedRecommendations.map((recommendation, index) => {
           const consistencyBadge = getConsistencyBadge(recommendation.consistency)
           const statusColors = getStatusColor(recommendation.status)
@@ -139,15 +151,15 @@ export default function NextTrainingRecommendations({
             <div
               key={index}
               className={cn(
-                "p-4 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer",
+                "p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer",
                 statusColors
               )}
               onClick={() => onExerciseSelect?.(recommendation.exerciseName)}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-3">
+              {/* Header - Compact layout */}
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <h4 className="font-semibold text-gray-900">
+                  <h4 className="font-semibold text-sm text-gray-900">
                     {recommendation.exerciseName}
                   </h4>
                   <Badge className={`text-xs ${consistencyBadge.color}`}>
@@ -157,36 +169,27 @@ export default function NextTrainingRecommendations({
                 {getStatusIcon(recommendation.status)}
               </div>
 
-              {/* Main message */}
-              <p className="text-sm font-medium mb-2">
+              {/* Main message - More compact */}
+              <p className="text-xs font-medium mb-2 text-gray-700">
                 {formatRecommendationMessage(recommendation)}
               </p>
 
-              {/* Details */}
-              <div className="flex items-center justify-between text-xs text-gray-600">
-                <div className="flex items-center space-x-4">
-                  <span>
-                    前回: {format(recommendation.lastTrainingDate, 'M月d日', { locale: ja })}
-                  </span>
-                  <span>
-                    平均間隔: {recommendation.averageFrequency.toFixed(1)}日
-                  </span>
-                </div>
+              {/* Details - Simplified */}
+              <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>
-                  推奨日: {format(recommendation.nextRecommendedDate, 'M月d日', { locale: ja })}
+                  前回: {format(recommendation.lastTrainingDate, 'M/d', { locale: ja })}
+                </span>
+                <span>
+                  推奨: {format(recommendation.nextRecommendedDate, 'M/d', { locale: ja })}
                 </span>
               </div>
 
-              {/* Progress indicator */}
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>前回トレーニング</span>
-                  <span>推奨日</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+              {/* Progress indicator - Compact */}
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div 
                     className={cn(
-                      "h-2 rounded-full transition-all duration-300",
+                      "h-1.5 rounded-full transition-all duration-300",
                       recommendation.status === 'overdue' && "bg-red-500",
                       recommendation.status === 'due_soon' && "bg-orange-500", 
                       recommendation.status === 'on_track' && "bg-green-500",

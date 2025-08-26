@@ -17,6 +17,7 @@ import { PRRecord, calculateE1RM, formatE1RM, findBestE1RMSet, getPRBadgeInfo, g
 import PRTrendModal from "./PR/PRTrendModal"
 import MuscleGroupAnalysis from "./PR/MuscleGroupAnalysis"
 import EnhancedWeeklyPRs from "./enhanced-weekly-prs"
+import NextTrainingRecommendations from "./next-training-recommendations"
 
 interface AnalyticsData {
   totalWorkouts: number
@@ -398,6 +399,14 @@ export default function AnalyticsScreen() {
         </Card>
       </div>
 
+      {/* Next Training Recommendations */}
+      <NextTrainingRecommendations 
+        maxItems={5}
+        onExerciseSelect={(exerciseName) => {
+          // Could navigate to record screen or show exercise details
+          console.log('Selected exercise for training:', exerciseName)
+        }}
+      />
 
       {/* Charts */}
       <Tabs defaultValue="progress" className="space-y-4">

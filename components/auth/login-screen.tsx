@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Eye, EyeOff, Mail, Lock, UserPlus, LogIn } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, UserPlus, LogIn, UserCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({ onClose }: LoginScreenProps) {
-  const { signIn, signUp, signInWithGoogle } = useAuth()
+  const { signIn, signUp, signInWithGoogle, signInAsGuest } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -89,7 +89,21 @@ export default function LoginScreen({ onClose }: LoginScreenProps) {
       await signInWithGoogle()
       onClose?.()
     } catch (error: any) {
-      setError("Googleでのログインに失敗しました")
+      setError(error.message || "Googleでのログインに失敗しました")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGuestSignIn = async () => {
+    setLoading(true)
+    setError("")
+    
+    try {
+      await signInAsGuest()
+      onClose?.()
+    } catch (error: any) {
+      setError(error.message || "ゲストログインに失敗しました")
     } finally {
       setLoading(false)
     }
@@ -264,6 +278,17 @@ export default function LoginScreen({ onClose }: LoginScreenProps) {
               />
             </svg>
             Googleでログイン
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-gray-300 text-gray-600 hover:bg-gray-50"
+            onClick={handleGuestSignIn}
+            disabled={loading}
+          >
+            <UserCheck className="mr-2 h-4 w-4" />
+            ゲストとして体験する
           </Button>
 
           <div className="text-center">

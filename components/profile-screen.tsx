@@ -21,6 +21,7 @@ import { doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { toast } from "sonner"
 import { uploadImage, validateImageFile, compressImage } from "@/lib/storage"
+import NotificationSettings from "./notification-settings"
 
 export default function ProfileScreen() {
   const { user, userProfile, logout } = useAuth()
@@ -136,31 +137,58 @@ export default function ProfileScreen() {
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !user) return
+    if (!file || !user) {
+      toast.error("ファイルが選択されていないか、ユーザー情報がありません")
+      return
+    }
 
+    console.log('Starting photo upload:', { fileName: file.name, fileSize: file.size, fileType: file.type })
     setUploadingPhoto(true)
 
     try {
       // Validate file
+      console.log('Validating file...')
       validateImageFile(file)
+      console.log('File validation passed')
 
       // Compress image
+      console.log('Compressing image...')
       const compressedFile = await compressImage(file, 400, 0.8)
+      console.log('Image compression completed', { originalSize: file.size, compressedSize: compressedFile.size })
 
       // Upload to storage
-      const photoURL = await uploadImage(compressedFile, `profile-photos`)
+      console.log('Uploading to Firebase Storage...')
+      const photoURL = await uploadImage(compressedFile, `profile-photos/${user.uid}`)
+      console.log('Upload successful, URL:', photoURL)
 
       // Update user profile in Firestore
+      console.log('Updating user profile in Firestore...')
       const userRef = doc(db, 'users', user.uid)
       await updateDoc(userRef, {
         photoURL,
         updatedAt: new Date()
       })
+      console.log('Profile update completed')
 
       toast.success("プロフィール写真を更新しました")
     } catch (error: any) {
-      console.error('Photo upload error:', error)
-      toast.error(error.message || "写真のアップロードに失敗しました")
+      console.error('Photo upload error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        error: error
+      })
+      
+      // More specific error messages
+      if (error.code === 'storage/unauthorized') {
+        toast.error("ストレージへのアクセス権限がありません。ログインし直してください。")
+      } else if (error.code === 'storage/canceled') {
+        toast.error("アップロードがキャンセルされました")
+      } else if (error.code === 'storage/unknown') {
+        toast.error("不明なエラーが発生しました。再度お試しください。")
+      } else {
+        toast.error(error.message || "写真のアップロードに失敗しました")
+      }
     } finally {
       setUploadingPhoto(false)
       // Reset file input
@@ -436,17 +464,21 @@ export default function ProfileScreen() {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
+          {/* トレーニング通知設定 */}
+          <NotificationSettings />
+          
+          {/* その他の設定 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Settings className="w-5 h-5" />
-                <span>設定</span>
+                <span>一般設定</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <p className="font-medium">通知</p>
+                  <p className="font-medium">SNS通知</p>
                   <p className="text-sm text-gray-600">新しいフォロワーやいいねの通知</p>
                 </div>
                 <Switch defaultChecked />

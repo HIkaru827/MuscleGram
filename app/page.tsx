@@ -1,24 +1,77 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import React from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { Home, Plus, BarChart3, Users, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import { WorkoutProvider } from "@/contexts/WorkoutContext"
-import HomeScreen from "@/components/home-screen"
-import RecordScreen from "@/components/record-screen"
-import AnalyticsScreen from "@/components/analytics-screen"
-import CommunityScreen from "@/components/community-screen"
-import ProfileScreen from "@/components/profile-screen"
+import { initializeFunctionWarmup } from "@/lib/warm-functions"
+import { NotificationManager } from "@/lib/notification-manager"
+import dynamic from "next/dynamic"
+
+const HomeScreen = dynamic(() => import("@/components/home-screen"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-600 border-t-transparent" /></div>
+})
+
+const RecordScreen = dynamic(() => import("@/components/record-screen"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-600 border-t-transparent" /></div>
+})
+
+const AnalyticsScreen = dynamic(() => import("@/components/analytics-screen"), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4 space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-white border rounded-lg p-4 skeleton-box h-24"></div>
+      ))}
+    </div>
+  )
+})
+
+const CommunityScreen = dynamic(() => import("@/components/community-screen"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-600 border-t-transparent" /></div>
+})
+
+const ProfileScreen = dynamic(() => import("@/components/profile-screen"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-600 border-t-transparent" /></div>
+})
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
 
 type Screen = "home" | "record" | "analytics" | "community" | "profile"
 
-export default function FitnessApp() {
+interface FitnessAppProps {
+  defaultScreen?: Screen
+}
+
+export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) {
   const { user, loading } = useAuth()
-  const [activeScreen, setActiveScreen] = useState<Screen>("home")
+  const router = useRouter()
+  const pathname = usePathname()
+  const [activeScreen, setActiveScreen] = useState<Screen>(defaultScreen)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+  // URLパスからスクリーンを決定する関数
+  const getScreenFromPath = (path: string): Screen => {
+    if (path === '/home') return 'home'
+    if (path === '/record') return 'record'  
+    if (path === '/analytics' || path === '/analysis') return 'analytics'
+    if (path === '/community') return 'community'
+    if (path === '/profile') return 'profile'
+    return 'home'
+  }
+
+  // URLが変更された時にactiveScreenを同期
+  useEffect(() => {
+    const screenFromPath = getScreenFromPath(pathname)
+    setActiveScreen(screenFromPath)
+  }, [pathname])
 
   // Listen for navigate to record event
   React.useEffect(() => {
@@ -32,12 +85,37 @@ export default function FitnessApp() {
     }
   }, [])
 
+  // Initialize function warmup on app load
+  React.useEffect(() => {
+    initializeFunctionWarmup()
+  }, [])
+
+  // Initialize notification system when user is loaded
+  React.useEffect(() => {
+    if (user && !loading) {
+      const notificationManager = NotificationManager.getInstance()
+      
+      // Load user notification settings and start daily checks
+      notificationManager.loadSettings(user.uid).then(() => {
+        notificationManager.startDailyCheck(user.uid)
+      }).catch(console.error)
+    }
+  }, [user, loading])
+
+  // Handle initial load completion
+  React.useEffect(() => {
+    if (!loading) {
+      // Delay to ensure DOM is painted
+      setTimeout(() => setIsInitialLoad(false), 100)
+    }
+  }, [loading])
+
   const screens = [
-    { id: "home" as Screen, label: "ホーム", icon: Home },
-    { id: "record" as Screen, label: "記録", icon: Plus },
-    { id: "analytics" as Screen, label: "分析", icon: BarChart3 },
-    { id: "community" as Screen, label: "コミュニティ", icon: Users },
-    { id: "profile" as Screen, label: "プロフィール", icon: User },
+    { id: "home" as Screen, label: "ホーム", icon: Home, path: "/home" },
+    { id: "record" as Screen, label: "記録", icon: Plus, path: "/record" },
+    { id: "analytics" as Screen, label: "分析", icon: BarChart3, path: "/analytics" },
+    { id: "community" as Screen, label: "コミュニティ", icon: Users, path: "/community" },
+    { id: "profile" as Screen, label: "プロフィール", icon: User, path: "/profile" },
   ]
 
   const renderActiveScreen = () => {
@@ -57,10 +135,52 @@ export default function FitnessApp() {
     }
   }
 
-  if (loading) {
+  if (loading || isInitialLoad) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-2 border-red-600 border-t-transparent" />
+      <div className="min-h-screen bg-white">
+        {/* Header Skeleton */}
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+          <div className="flex items-center justify-center h-16 px-4">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Muscle<span className="text-red-600">Gram</span>
+            </h1>
+          </div>
+        </header>
+
+        {/* Content Skeleton */}
+        <main className="pb-20 p-4">
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+                <div className="flex items-start space-x-3 animate-pulse">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-16 mb-3"></div>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-gray-200 rounded w-full"></div>
+                      <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+
+        {/* Navigation Skeleton */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-50">
+          <div className="flex items-center justify-around h-20 px-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex flex-col items-center justify-center flex-1 py-2 px-1">
+                <div className="p-2 rounded-xl">
+                  <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="h-3 w-8 bg-gray-200 rounded mt-1 animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </nav>
       </div>
     )
   }
@@ -85,7 +205,7 @@ export default function FitnessApp() {
         {activeScreen !== "record" && <WorkoutIndicator />}
 
         {/* Main Content */}
-        <main className="pb-20">{renderActiveScreen()}</main>
+        <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">{renderActiveScreen()}</main>
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-50">
@@ -97,7 +217,7 @@ export default function FitnessApp() {
               return (
                 <button
                   key={screen.id}
-                  onClick={() => setActiveScreen(screen.id)}
+                  onClick={() => router.push(screen.path)}
                   className={cn(
                     "flex flex-col items-center justify-center flex-1 py-2 px-1 transition-all duration-200",
                     isActive ? "text-red-600" : "text-gray-500 hover:text-gray-700",

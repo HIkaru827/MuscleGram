@@ -9,6 +9,7 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInAnonymously,
   updateProfile
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
@@ -34,6 +35,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, displayName: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
+  signInAsGuest: () => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -51,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
 
   const createUserProfile = async (user: User, additionalData?: any) => {
     if (!user) return
@@ -117,6 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('デモモードではGoogleログインは利用できません。Firebase設定を完了してください。')
     }
 
+    console.log('Starting Google sign in...')
+    console.log('Current domain:', window.location.origin)
+    
     try {
       const provider = new GoogleAuthProvider()
       // Add additional scopes if needed
@@ -128,16 +134,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         prompt: 'select_account'
       })
       
+      console.log('Opening Google sign in popup...')
       const result = await signInWithPopup(auth, provider)
+      console.log('Google sign in successful:', result.user.email)
+      
       await createUserProfile(result.user)
+      console.log('User profile created/updated')
     } catch (error: any) {
-      console.error('Google sign in error:', error)
+      console.error('Google sign in error details:', {
+        code: error.code,
+        message: error.message,
+        customData: error.customData,
+        stack: error.stack,
+        error: error
+      })
       
       // More specific error handling
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('ポップアップが閉じられました。再度お試しください。')
       } else if (error.code === 'auth/popup-blocked') {
         throw new Error('ポップアップがブロックされています。ブラウザの設定を確認してください。')
+      } else if (error.code === 'auth/unauthorized-domain') {
+        throw new Error(`このドメイン(${window.location.origin})はFirebase Authで承認されていません。Firebase Consoleで承認済みドメインに追加してください。`)
       } else if (error.code === 'auth/network-request-failed') {
         throw new Error('ネットワークエラーが発生しました。接続を確認してください。')
       } else if (error.code === 'auth/internal-error') {
@@ -146,6 +164,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Firebase設定が見つかりません。設定を確認してください。')
       } else if (error.code === 'auth/invalid-api-key') {
         throw new Error('無効なAPIキーです。Firebase設定を確認してください。')
+      }
+      
+      throw error
+    }
+  }
+
+  const signInAsGuest = async () => {
+    // Check if we're in demo mode
+    const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+    
+    if (isDemoMode) {
+      throw new Error('デモモードではゲストログインは利用できません。Firebase設定を完了してください。')
+    }
+
+    console.log('Starting guest sign in...')
+    
+    try {
+      const result = await signInAnonymously(auth)
+      console.log('Guest sign in successful:', result.user.uid)
+      
+      // Create a guest user profile
+      await createUserProfile(result.user, { 
+        displayName: `ゲスト${result.user.uid.slice(-6)}`,
+        isGuest: true 
+      })
+      console.log('Guest profile created')
+    } catch (error: any) {
+      console.error('Guest sign in error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+        error: error
+      })
+      
+      // Specific error handling
+      if (error.code === 'auth/operation-not-allowed') {
+        throw new Error('匿名認証が無効になっています。Firebase Consoleで匿名認証を有効にしてください。')
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('ネットワークエラーが発生しました。接続を確認してください。')
       }
       
       throw error
@@ -163,47 +220,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Check if we're in demo mode
-    const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
-    
-    if (isDemoMode) {
-      // In demo mode, create a mock user to show UI
-      const mockUser = {
-        uid: 'demo-user',
-        email: 'demo@example.com',
-        displayName: 'Demo User',
-        photoURL: null,
-      } as any
+    // Delay Firebase initialization to prioritize initial render
+    const delayedInit = setTimeout(() => {
+      // Check if we're in demo mode
+      const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+      
+      if (isDemoMode) {
+        // In demo mode, create a mock user to show UI
+        const mockUser = {
+          uid: 'demo-user',
+          email: 'demo@example.com',
+          displayName: 'Demo User',
+          photoURL: null,
+        } as any
 
-      setUser(mockUser)
-      setUserProfile({
-        uid: 'demo-user',
-        email: 'demo@example.com',
-        displayName: 'Demo User',
-        photoURL: '',
-        bio: 'This is a demo user for testing the UI',
-        followers: 10,
-        following: 5,
-        postsCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      setLoading(false)
-      return
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user)
-        await createUserProfile(user)
-      } else {
-        setUser(null)
-        setUserProfile(null)
+        setUser(mockUser)
+        setUserProfile({
+          uid: 'demo-user',
+          email: 'demo@example.com',
+          displayName: 'Demo User',
+          photoURL: '',
+          bio: 'This is a demo user for testing the UI',
+          followers: 10,
+          following: 5,
+          postsCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        setLoading(false)
+        setInitialized(true)
+        return
       }
-      setLoading(false)
-    })
 
-    return () => unsubscribe()
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          setUser(user)
+          await createUserProfile(user)
+        } else {
+          setUser(null)
+          setUserProfile(null)
+        }
+        setLoading(false)
+        setInitialized(true)
+      })
+
+      return () => unsubscribe()
+    }, 50) // 50ms delay to allow skeleton render first
+
+    return () => clearTimeout(delayedInit)
   }, [])
 
   const value: AuthContextType = {
@@ -213,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signUp,
     signInWithGoogle,
+    signInAsGuest,
     logout,
   }
 

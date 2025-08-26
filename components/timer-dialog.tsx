@@ -22,13 +22,15 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
   const [isRunning, setIsRunning] = useState(false)
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null)
 
-  // Only cleanup intervals when dialog closes, but preserve timer state
+  // Timer should continue running even when dialog is closed
+  // Only cleanup on unmount, not when dialog closes
   useEffect(() => {
-    if (!isOpen && timerId) {
-      clearInterval(timerId)
-      setTimerId(null)
+    return () => {
+      if (timerId) {
+        clearInterval(timerId)
+      }
     }
-  }, [isOpen, timerId])
+  }, [])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -93,13 +95,6 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
     setTimerId(id)
   }
 
-  useEffect(() => {
-    return () => {
-      if (timerId) {
-        clearInterval(timerId)
-      }
-    }
-  }, [timerId])
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

@@ -1,5 +1,7 @@
-import RecordScreen from "@/components/record-screen"
+"use client"
+
+import FitnessApp from "../page"
 
 export default function RecordPage() {
-  return <RecordScreen />
+  return <FitnessApp defaultScreen="record" />
 }
