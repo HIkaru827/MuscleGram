@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Home, Plus, BarChart3, Users, User } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -40,7 +39,6 @@ const ProfileScreen = dynamic(() => import('@/components/profile-screen'), {
 })
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
-import ErrorBoundary from "@/components/error-boundary"
 
 type Screen = "home" | "record" | "analytics" | "community" | "profile"
 
@@ -282,31 +280,22 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   }
 
   return (
-    <ErrorBoundary>
-      <WorkoutProvider>
-        <div className="min-h-screen bg-white">
-          {/* Header */}
-          <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-            <div className="flex items-center justify-center h-16 px-4">
-              <h1 className="text-2xl font-bold text-gray-900">
-                Muscle<span className="text-red-500">Gram</span>
-              </h1>
-            </div>
-          </header>
+    <WorkoutProvider>
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+          <div className="flex items-center justify-center h-16 px-4">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Muscle<span className="text-red-500">Gram</span>
+            </h1>
+          </div>
+        </header>
 
-          {/* Workout Indicator */}
-          {activeScreen !== "record" && (
-            <ErrorBoundary>
-              <WorkoutIndicator />
-            </ErrorBoundary>
-          )}
+        {/* Workout Indicator */}
+        {activeScreen !== "record" && <WorkoutIndicator />}
 
-          {/* Main Content */}
-          <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">
-            <ErrorBoundary>
-              {renderActiveScreen()}
-            </ErrorBoundary>
-          </main>
+        {/* Main Content */}
+        <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">{renderActiveScreen()}</main>
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-50">
