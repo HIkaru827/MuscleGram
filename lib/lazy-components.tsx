@@ -4,46 +4,38 @@
 
 import dynamic from 'next/dynamic'
 
-// Create optimized loading components
-const createLoadingComponent = (name: string) => () => (
+// Fast loading component
+const FastLoading = () => (
   <div className="flex items-center justify-center h-32">
-    <div className="flex flex-col items-center space-y-2">
-      <div className="animate-spin rounded-full h-8 w-8 border-2 border-red-500 border-t-transparent" />
-      <span className="text-sm text-gray-500">{name}を読み込んでいます...</span>
-    </div>
+    <div className="animate-spin rounded-full h-6 w-6 border-2 border-red-500 border-t-transparent" />
   </div>
 )
 
-// Screen components with optimized loading
+// Screen components with minimal loading delay
 export const LazyHomeScreen = dynamic(() => import('@/components/home-screen'), {
-  loading: createLoadingComponent('ホーム画面'),
-  ssr: false
+  loading: FastLoading
 })
 
 export const LazyRecordScreen = dynamic(() => import('@/components/record-screen'), {
-  loading: createLoadingComponent('記録画面'),
-  ssr: false
+  loading: FastLoading
 })
 
 export const LazyAnalyticsScreen = dynamic(() => import('@/components/analytics-screen'), {
   loading: () => (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-2">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-white border rounded-lg p-4 skeleton-box h-24"></div>
+        <div key={i} className="bg-gray-100 rounded-lg h-16 animate-pulse"></div>
       ))}
     </div>
-  ),
-  ssr: false
+  )
 })
 
 export const LazyCommunityScreen = dynamic(() => import('@/components/community-screen'), {
-  loading: createLoadingComponent('コミュニティ画面'),
-  ssr: false
+  loading: FastLoading
 })
 
 export const LazyProfileScreen = dynamic(() => import('@/components/profile-screen'), {
-  loading: createLoadingComponent('プロフィール画面'),
-  ssr: false
+  loading: FastLoading
 })
 
 // Heavy components that should be loaded lazily
