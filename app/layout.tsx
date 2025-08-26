@@ -7,6 +7,7 @@ import { WorkoutProvider } from "@/contexts/WorkoutContext"
 import PWAInstallPrompt from "@/components/pwa-install"
 import StructuredData from "@/components/structured-data"
 import { Toaster } from "sonner"
+import Script from "next/script"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -120,6 +121,18 @@ export default function RootLayout({
             <Toaster position="top-center" richColors />
           </WorkoutProvider>
         </AuthProvider>
+        
+        {/* Performance optimizations */}
+        <Script id="bundle-optimizer" strategy="afterInteractive">
+          {`
+            // Initialize bundle optimizations
+            if (typeof window !== 'undefined') {
+              import('/lib/bundle-optimizer.js').then(module => {
+                module.initializeBundleOptimizations()
+              }).catch(console.error)
+            }
+          `}
+        </Script>
       </body>
     </html>
   )

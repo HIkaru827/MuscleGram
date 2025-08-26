@@ -11,13 +11,16 @@ import { initializeFunctionWarmup } from "@/lib/warm-functions"
 import { NotificationManager } from "@/lib/notification-manager"
 import dynamic from "next/dynamic"
 import { useDebugger } from "@/lib/debug-utils"
+import { usePerformanceMonitor } from "@/lib/performance-monitor"
 
-// Preload components on hover/focus for better performance
-const HomeScreen = dynamic(() => import("@/components/home-screen"))
-const RecordScreen = dynamic(() => import("@/components/record-screen"))
-const AnalyticsScreen = dynamic(() => import("@/components/analytics-screen"))
-const CommunityScreen = dynamic(() => import("@/components/community-screen"))
-const ProfileScreen = dynamic(() => import("@/components/profile-screen"))
+// Use optimized lazy components
+import { 
+  LazyHomeScreen as HomeScreen,
+  LazyRecordScreen as RecordScreen, 
+  LazyAnalyticsScreen as AnalyticsScreen,
+  LazyCommunityScreen as CommunityScreen,
+  LazyProfileScreen as ProfileScreen
+} from "@/lib/lazy-components"
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
 
@@ -37,6 +40,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   const [loadingScreen, setLoadingScreen] = useState<Screen | null>(null)
   const [preloadedScreens, setPreloadedScreens] = useState<Set<Screen>>(new Set())
   const { logApp, markFirstRender } = useDebugger()
+  const { trackRouteChange } = usePerformanceMonitor()
 
   // Debug logging with more details
   logApp('FitnessApp render', { 
@@ -59,9 +63,15 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
 
   // URLが変更された時にactiveScreenを同期
   useEffect(() => {
+    const startTime = performance.now()
     const screenFromPath = getScreenFromPath(pathname)
     setActiveScreen(screenFromPath)
-  }, [pathname])
+    
+    // パフォーマンス追跡
+    requestIdleCallback(() => {
+      trackRouteChange(pathname, startTime)
+    })
+  }, [pathname, trackRouteChange])
 
   // Listen for navigate to record event
   React.useEffect(() => {

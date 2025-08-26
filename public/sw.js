@@ -1,4 +1,8 @@
-const CACHE_NAME = 'musclegram-v5'
+const CACHE_NAME = 'musclegram-v6'
+const STATIC_CACHE = 'static-v6'
+const DYNAMIC_CACHE = 'dynamic-v6'
+
+// Critical resources that should be cached immediately
 const urlsToCache = [
   '/',
   '/icon-192x192.png',
@@ -7,28 +11,46 @@ const urlsToCache = [
   '/manifest.json'
 ]
 
+// Resources that should be cached dynamically
+const dynamicCacheUrls = [
+  '/_next/static/css/',
+  '/_next/static/chunks/',
+  '/_next/static/media/',
+  '/api/',
+  '/images/'
+]
+
 // Install event
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('SW: Installing cache', CACHE_NAME)
-        return cache.addAll(urlsToCache)
-      })
-      .catch((error) => {
-        console.error('SW: Cache installation failed:', error)
-      })
+    Promise.all([
+      caches.open(STATIC_CACHE)
+        .then((cache) => {
+          console.log('SW: Installing static cache', STATIC_CACHE)
+          return cache.addAll(urlsToCache)
+        }),
+      caches.open(DYNAMIC_CACHE)
+        .then((cache) => {
+          console.log('SW: Creating dynamic cache', DYNAMIC_CACHE)
+        })
+    ])
+    .catch((error) => {
+      console.error('SW: Cache installation failed:', error)
+    })
   )
   self.skipWaiting()
 })
 
 // Activate event
 self.addEventListener('activate', (event) => {
+  const currentCaches = [STATIC_CACHE, DYNAMIC_CACHE]
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (!currentCaches.includes(cacheName)) {
+            console.log('SW: Deleting old cache:', cacheName)
             return caches.delete(cacheName)
           }
         })
@@ -56,51 +78,59 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Enhanced fetch strategy with timeout
+  // Improved caching strategy
   event.respondWith(
-    Promise.race([
-      caches.match(event.request)
-        .then((response) => {
-          if (response) {
-            // Cache hit - return cached response but also try to update cache in background
-            fetchAndUpdateCache(event.request)
-            return response
-          }
-          // Cache miss - fetch from network with timeout
-          return fetchWithTimeout(event.request, 5000)
-        }),
-      // Fallback timeout
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Service Worker timeout')), 10000)
-      )
-    ])
-    .catch((error) => {
-      console.error('Service Worker fetch error:', error)
-      
-      // Try cache one more time before giving up
-      return caches.match(event.request)
-        .then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse
-          }
-          
-          // Final fallback
-          if (event.request.destination === 'document') {
-            return new Response(
-              '<!DOCTYPE html><html><head><title>オフライン</title></head><body><h1>読み込み中...</h1><p>アプリを読み込んでいます。しばらくお待ちください。</p><script>setTimeout(() => window.location.reload(), 3000)</script></body></html>',
-              { headers: { 'Content-Type': 'text/html' } }
-            )
-          }
-          return new Response('Service Unavailable', { 
-            status: 503,
-            statusText: 'Service Worker Error' 
-          })
-        })
-    })
+    getCachedResponse(event.request)
+      .catch((error) => {
+        console.error('Service Worker fetch error:', error)
+        return getOfflineResponse(event.request)
+      })
   )
 })
 
-// Helper function to fetch with timeout
+// Smart caching strategy
+async function getCachedResponse(request) {
+  // Check static cache first for critical resources
+  const staticResponse = await caches.match(request, { cacheName: STATIC_CACHE })
+  if (staticResponse) {
+    return staticResponse
+  }
+
+  // Check dynamic cache
+  const dynamicResponse = await caches.match(request, { cacheName: DYNAMIC_CACHE })
+  if (dynamicResponse) {
+    // Update cache in background if it's old
+    updateCacheInBackground(request)
+    return dynamicResponse
+  }
+
+  // Fetch from network and cache if appropriate
+  return fetchAndCache(request)
+}
+
+async function fetchAndCache(request) {
+  try {
+    const response = await fetchWithTimeout(request, 5000)
+    
+    if (response.ok && shouldCache(request)) {
+      const cache = await caches.open(DYNAMIC_CACHE)
+      cache.put(request, response.clone())
+    }
+    
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+function shouldCache(request) {
+  const url = request.url
+  return dynamicCacheUrls.some(pattern => url.includes(pattern)) ||
+         request.destination === 'image' ||
+         request.destination === 'style' ||
+         request.destination === 'script'
+}
+
 function fetchWithTimeout(request, timeout = 5000) {
   return Promise.race([
     fetch(request),
@@ -110,19 +140,26 @@ function fetchWithTimeout(request, timeout = 5000) {
   ])
 }
 
-// Helper function to update cache in background
-function fetchAndUpdateCache(request) {
-  fetchWithTimeout(request, 3000)
-    .then(response => {
-      if (response.ok) {
-        return caches.open(CACHE_NAME).then(cache => {
-          cache.put(request, response.clone())
-        })
-      }
-    })
-    .catch(error => {
-      console.log('Background cache update failed:', error.message)
-    })
+async function updateCacheInBackground(request) {
+  try {
+    const response = await fetchWithTimeout(request, 3000)
+    if (response.ok) {
+      const cache = await caches.open(DYNAMIC_CACHE)
+      await cache.put(request, response)
+    }
+  } catch (error) {
+    // Silent failure for background updates
+  }
+}
+
+function getOfflineResponse(request) {
+  if (request.destination === 'document') {
+    return new Response(
+      '<!DOCTYPE html><html><head><title>オフライン</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:sans-serif;text-align:center;padding:2rem;}</style></head><body><h1>🔄 読み込み中...</h1><p>アプリを読み込んでいます。</p><button onclick="location.reload()">再試行</button></body></html>',
+      { headers: { 'Content-Type': 'text/html' } }
+    )
+  }
+  return new Response('Offline', { status: 503 })
 }
 
 // Background sync for workout timer
