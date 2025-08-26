@@ -166,7 +166,13 @@ export const getTrainingRecommendations = onRequest(
   async (request, response) => {
     return corsHandler(request, response, async () => {
       try {
-        const userId = request.query.userId as string;
+        // Handle warmup requests first
+        if (request.body?.warmup || request.body?.userId === 'warmup-ping') {
+          response.json({ status: 'warmed up', function: 'getTrainingRecommendations' });
+          return;
+        }
+
+        const userId = request.body?.userId || request.query.userId as string;
         
         if (!userId) {
           response.status(400).json({ error: 'userId is required' });
@@ -315,16 +321,16 @@ export const getWorkoutAnalytics = onRequest(
   async (request, response) => {
     return corsHandler(request, response, async () => {
       try {
-        const userId = request.query.userId as string;
-        
-        if (!userId) {
-          response.status(400).json({ error: 'userId is required' });
+        // Handle warmup requests first
+        if (request.body?.warmup || request.body?.userId === 'warmup-ping') {
+          response.json({ status: 'warmed up', function: 'getWorkoutAnalytics' });
           return;
         }
 
-        // Handle warmup requests
-        if (request.body?.warmup) {
-          response.json({ status: 'warmed up', function: 'getWorkoutAnalytics' });
+        const userId = request.body?.userId || request.query.userId as string;
+        
+        if (!userId) {
+          response.status(400).json({ error: 'userId is required' });
           return;
         }
 

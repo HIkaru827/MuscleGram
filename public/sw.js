@@ -1,4 +1,4 @@
-const CACHE_NAME = 'musclegram-v3'
+const CACHE_NAME = 'musclegram-v4'
 const urlsToCache = [
   '/',
   '/icon-192x192.png',
@@ -38,43 +38,89 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Fetch event
+// Fetch event with improved error handling
 self.addEventListener('fetch', (event) => {
-  // Skip service worker for API requests to avoid CORS issues
+  // Skip service worker for external APIs and development requests
   if (event.request.url.includes('cloudfunctions.net') || 
       event.request.url.includes('googleapis.com') ||
       event.request.url.includes('gstatic.com') ||
       event.request.url.includes('accounts.google.com') ||
       event.request.url.includes('firebaseio.com') ||
-      event.request.url.includes('/api/')) {
+      event.request.url.includes('/api/') ||
+      event.request.url.includes('_next/webpack-hmr') ||
+      event.request.url.includes('_next/static/chunks/webpack.js') ||
+      (event.request.url.includes('localhost') && event.request.url.includes('?v='))) {
     return
   }
 
+  // Enhanced fetch strategy with timeout
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response
-        }
-        return fetch(event.request)
-      })
-      .catch((error) => {
-        console.error('Service Worker fetch error:', error)
-        // Fallback to network request if cache fails
-        return fetch(event.request).catch(() => {
-          // If both cache and network fail, return offline page or error response
+    Promise.race([
+      caches.match(event.request)
+        .then((response) => {
+          if (response) {
+            // Cache hit - return cached response but also try to update cache in background
+            fetchAndUpdateCache(event.request)
+            return response
+          }
+          // Cache miss - fetch from network with timeout
+          return fetchWithTimeout(event.request, 5000)
+        }),
+      // Fallback timeout
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Service Worker timeout')), 10000)
+      )
+    ])
+    .catch((error) => {
+      console.error('Service Worker fetch error:', error)
+      
+      // Try cache one more time before giving up
+      return caches.match(event.request)
+        .then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse
+          }
+          
+          // Final fallback
           if (event.request.destination === 'document') {
             return new Response(
-              '<!DOCTYPE html><html><head><title>オフライン</title></head><body><h1>オフラインです</h1><p>インターネット接続を確認してください。</p></body></html>',
+              '<!DOCTYPE html><html><head><title>オフライン</title></head><body><h1>読み込み中...</h1><p>アプリを読み込んでいます。しばらくお待ちください。</p><script>setTimeout(() => window.location.reload(), 3000)</script></body></html>',
               { headers: { 'Content-Type': 'text/html' } }
             )
           }
-          return new Response('Network Error', { status: 408 })
+          return new Response('Service Unavailable', { 
+            status: 503,
+            statusText: 'Service Worker Error' 
+          })
         })
-      })
+    })
   )
 })
+
+// Helper function to fetch with timeout
+function fetchWithTimeout(request, timeout = 5000) {
+  return Promise.race([
+    fetch(request),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Fetch timeout')), timeout)
+    )
+  ])
+}
+
+// Helper function to update cache in background
+function fetchAndUpdateCache(request) {
+  fetchWithTimeout(request, 3000)
+    .then(response => {
+      if (response.ok) {
+        return caches.open(CACHE_NAME).then(cache => {
+          cache.put(request, response.clone())
+        })
+      }
+    })
+    .catch(error => {
+      console.log('Background cache update failed:', error.message)
+    })
+}
 
 // Background sync for workout timer
 self.addEventListener('message', (event) => {

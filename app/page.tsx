@@ -10,6 +10,7 @@ import { WorkoutProvider } from "@/contexts/WorkoutContext"
 import { initializeFunctionWarmup } from "@/lib/warm-functions"
 import { NotificationManager } from "@/lib/notification-manager"
 import dynamic from "next/dynamic"
+import { useDebugger } from "@/lib/debug-utils"
 
 const HomeScreen = dynamic(() => import("@/components/home-screen"), {
   ssr: false,
@@ -56,9 +57,17 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   const pathname = usePathname()
   const [activeScreen, setActiveScreen] = useState<Screen>(defaultScreen)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [authTimeout, setAuthTimeout] = useState(false)
+  const { logApp, markFirstRender } = useDebugger()
 
-  // Debug logging
-  console.log('FitnessApp render:', { user: user?.uid, loading, isInitialLoad })
+  // Debug logging with more details
+  logApp('FitnessApp render', { 
+    user: user?.uid, 
+    loading, 
+    isInitialLoad, 
+    authTimeout,
+    timestamp: new Date().toISOString() 
+  })
 
   // URLパスからスクリーンを決定する関数
   const getScreenFromPath = (path: string): Screen => {
@@ -105,17 +114,43 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     }
   }, [user, loading])
 
-  // Handle initial load completion
+  // Handle initial load completion with timeout fallback
   React.useEffect(() => {
     if (!loading) {
       // Delay to ensure DOM is painted
       const timer = setTimeout(() => {
         setIsInitialLoad(false)
-        console.log('Initial load completed, isInitialLoad set to false')
+        markFirstRender()
+        logApp('Initial load completed, isInitialLoad set to false')
       }, 500)
       return () => clearTimeout(timer)
     }
   }, [loading])
+
+  // Authentication timeout - prevent infinite loading
+  React.useEffect(() => {
+    const authTimeoutTimer = setTimeout(() => {
+      if (loading && isInitialLoad) {
+        logApp('Authentication timeout - proceeding without user')
+        setAuthTimeout(true)
+        setIsInitialLoad(false)
+      }
+    }, 10000) // 10 second timeout
+
+    return () => clearTimeout(authTimeoutTimer)
+  }, [loading, isInitialLoad])
+
+  // Force load completion if stuck
+  React.useEffect(() => {
+    const forceLoadTimer = setTimeout(() => {
+      if (isInitialLoad) {
+        logApp('Force completing initial load after 15 seconds')
+        setIsInitialLoad(false)
+      }
+    }, 15000) // 15 second force timeout
+
+    return () => clearTimeout(forceLoadTimer)
+  }, [])
 
   const screens = [
     { id: "home" as Screen, label: "ホーム", icon: Home, path: "/home" },
@@ -142,7 +177,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     }
   }
 
-  if (loading || isInitialLoad) {
+  if ((loading || isInitialLoad) && !authTimeout) {
     return (
       <div className="min-h-screen bg-white">
         {/* Header Skeleton */}
@@ -192,8 +227,28 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     )
   }
 
-  if (!user) {
+  if (!user && !authTimeout) {
     return <LoginScreen />
+  }
+
+  // If we hit auth timeout and no user, show login with retry option
+  if (authTimeout && !user) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Muscle<span className="text-red-500">Gram</span>
+          </h1>
+          <p className="text-gray-600 mb-6">認証に時間がかかっています。再試行してください。</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-colors"
+          >
+            再読み込み
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

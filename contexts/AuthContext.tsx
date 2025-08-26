@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
+import { logAuthEvent, logError, debugger } from '@/lib/debug-utils'
 
 interface UserProfile {
   uid: string
@@ -304,7 +305,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      // Add timeout for auth state initialization
+      const authTimeout = setTimeout(() => {
+        if (loading && !initialized) {
+          console.warn('Auth state initialization timeout - setting loading to false')
+          setLoading(false)
+          setInitialized(true)
+        }
+      }, 8000) // 8 second timeout for auth initialization
+
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        clearTimeout(authTimeout) // Clear timeout if auth state changes
+        
+        logAuthEvent('Auth state changed', { hasUser: !!user, uid: user?.uid })
+        
         if (user) {
           setUser(user)
           await createUserProfile(user)
@@ -329,9 +343,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setLoading(false)
         setInitialized(true)
+        debugger.markAuthResolution()
       })
 
-      return () => unsubscribe()
+      return () => {
+        unsubscribe()
+        clearTimeout(authTimeout) // Clean up auth timeout
+      }
     }, 50) // 50ms delay to allow skeleton render first
 
     return () => clearTimeout(delayedInit)

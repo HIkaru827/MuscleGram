@@ -128,8 +128,14 @@ const corsHandler = (0, cors_1.default)({
  */
 exports.getTrainingRecommendations = (0, https_1.onRequest)({ cors: true }, async (request, response) => {
     return corsHandler(request, response, async () => {
+        var _a, _b, _c;
         try {
-            const userId = request.query.userId;
+            // Handle warmup requests first
+            if (((_a = request.body) === null || _a === void 0 ? void 0 : _a.warmup) || ((_b = request.body) === null || _b === void 0 ? void 0 : _b.userId) === 'warmup-ping') {
+                response.json({ status: 'warmed up', function: 'getTrainingRecommendations' });
+                return;
+            }
+            const userId = ((_c = request.body) === null || _c === void 0 ? void 0 : _c.userId) || request.query.userId;
             if (!userId) {
                 response.status(400).json({ error: 'userId is required' });
                 return;
@@ -246,16 +252,16 @@ exports.calculateWorkoutFrequency = (0, https_1.onRequest)({ cors: true }, async
  */
 exports.getWorkoutAnalytics = (0, https_1.onRequest)({ cors: true }, async (request, response) => {
     return corsHandler(request, response, async () => {
-        var _a;
+        var _a, _b, _c;
         try {
-            const userId = request.query.userId;
-            if (!userId) {
-                response.status(400).json({ error: 'userId is required' });
+            // Handle warmup requests first
+            if (((_a = request.body) === null || _a === void 0 ? void 0 : _a.warmup) || ((_b = request.body) === null || _b === void 0 ? void 0 : _b.userId) === 'warmup-ping') {
+                response.json({ status: 'warmed up', function: 'getWorkoutAnalytics' });
                 return;
             }
-            // Handle warmup requests
-            if ((_a = request.body) === null || _a === void 0 ? void 0 : _a.warmup) {
-                response.json({ status: 'warmed up', function: 'getWorkoutAnalytics' });
+            const userId = ((_c = request.body) === null || _c === void 0 ? void 0 : _c.userId) || request.query.userId;
+            if (!userId) {
+                response.status(400).json({ error: 'userId is required' });
                 return;
             }
             firebase_functions_1.logger.info(`Getting workout analytics for user: ${userId}`);
