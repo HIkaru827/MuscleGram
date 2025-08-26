@@ -1,8 +1,9 @@
-const CACHE_NAME = 'musclegram-v2'
+const CACHE_NAME = 'musclegram-v3'
 const urlsToCache = [
   '/',
-  '/icon-192.svg',
-  '/icon-512.svg',
+  '/icon-192x192.png',
+  '/icon-512x512.png', 
+  '/app_logo.png',
   '/manifest.json'
 ]
 
@@ -10,7 +11,13 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+      .then((cache) => {
+        console.log('SW: Installing cache', CACHE_NAME)
+        return cache.addAll(urlsToCache)
+      })
+      .catch((error) => {
+        console.error('SW: Cache installation failed:', error)
+      })
   )
   self.skipWaiting()
 })
