@@ -69,6 +69,7 @@ self.addEventListener('fetch', (event) => {
       event.request.url.includes('accounts.google.com') ||
       event.request.url.includes('firebaseio.com') ||
       event.request.url.includes('google.com') ||
+      event.request.url.includes('googleusercontent.com') ||
       event.request.url.includes('google-analytics.com') ||
       event.request.url.includes('googletagmanager.com') ||
       event.request.url.includes('/api/') ||
