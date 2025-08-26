@@ -13,16 +13,34 @@ import dynamic from "next/dynamic"
 import { useDebugger } from "@/lib/debug-utils"
 import { usePerformanceMonitor } from "@/lib/performance-monitor"
 
-// Use static imports for instant page transitions
-import {
-  HomeScreen,
-  RecordScreen,
-  AnalyticsScreen,
-  CommunityScreen,
-  ProfileScreen
-} from "@/lib/static-components"
+// Revert to safer dynamic imports with error handling
+const HomeScreen = dynamic(() => import('@/components/home-screen'), {
+  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
+  ssr: false
+})
+
+const RecordScreen = dynamic(() => import('@/components/record-screen'), {
+  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
+  ssr: false
+})
+
+const AnalyticsScreen = dynamic(() => import('@/components/analytics-screen'), {
+  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
+  ssr: false
+})
+
+const CommunityScreen = dynamic(() => import('@/components/community-screen'), {
+  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
+  ssr: false
+})
+
+const ProfileScreen = dynamic(() => import('@/components/profile-screen'), {
+  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
+  ssr: false
+})
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
+import ErrorBoundary from "@/components/error-boundary"
 
 type Screen = "home" | "record" | "analytics" | "community" | "profile"
 
@@ -264,22 +282,31 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   }
 
   return (
-    <WorkoutProvider>
-      <div className="min-h-screen bg-white">
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-          <div className="flex items-center justify-center h-16 px-4">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Muscle<span className="text-red-500">Gram</span>
-            </h1>
-          </div>
-        </header>
+    <ErrorBoundary>
+      <WorkoutProvider>
+        <div className="min-h-screen bg-white">
+          {/* Header */}
+          <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+            <div className="flex items-center justify-center h-16 px-4">
+              <h1 className="text-2xl font-bold text-gray-900">
+                Muscle<span className="text-red-500">Gram</span>
+              </h1>
+            </div>
+          </header>
 
-        {/* Workout Indicator */}
-        {activeScreen !== "record" && <WorkoutIndicator />}
+          {/* Workout Indicator */}
+          {activeScreen !== "record" && (
+            <ErrorBoundary>
+              <WorkoutIndicator />
+            </ErrorBoundary>
+          )}
 
-        {/* Main Content */}
-        <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">{renderActiveScreen()}</main>
+          {/* Main Content */}
+          <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">
+            <ErrorBoundary>
+              {renderActiveScreen()}
+            </ErrorBoundary>
+          </main>
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-50">
