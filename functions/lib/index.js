@@ -1,10 +1,15 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.calculateTrainingFrequency = void 0;
+exports.getTrainingRecommendations = exports.calculateTrainingFrequency = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
+const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
 const firestore_2 = require("firebase-admin/firestore");
 const firebase_functions_1 = require("firebase-functions");
+const cors_1 = __importDefault(require("cors"));
 // Initialize Firebase Admin
 (0, app_1.initializeApp)();
 const db = (0, firestore_2.getFirestore)();
@@ -40,7 +45,8 @@ exports.calculateTrainingFrequency = (0, firestore_1.onDocumentCreated)("workout
                 // Query all workout posts for the same user (without ordering to avoid index requirement)
                 const postsQuery = db
                     .collection('workout_posts')
-                    .where('userId', '==', userId);
+                    .where('userId', '==', userId)
+                    .limit(200); // Add reasonable limit to avoid excessive reads
                 const postsSnapshot = await postsQuery.get();
                 // Filter posts that contain this specific exercise and extract workout dates
                 const exerciseDates = [];
@@ -104,5 +110,72 @@ exports.calculateTrainingFrequency = (0, firestore_1.onDocumentCreated)("workout
         firebase_functions_1.logger.error("Error calculating training frequency:", error);
         throw error;
     }
+});
+// CORS configuration
+const corsHandler = (0, cors_1.default)({
+    origin: [
+        'https://musclegram.net',
+        'https://www.musclegram.net',
+        'https://musclegram-app.vercel.app',
+        'http://localhost:3000'
+    ],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+});
+/**
+ * Get training recommendations based on user's analytics data
+ */
+exports.getTrainingRecommendations = (0, https_1.onRequest)({ cors: true }, async (request, response) => {
+    return corsHandler(request, response, async () => {
+        try {
+            const userId = request.query.userId;
+            if (!userId) {
+                response.status(400).json({ error: 'userId is required' });
+                return;
+            }
+            firebase_functions_1.logger.info(`Getting training recommendations for user: ${userId}`);
+            // Get user's analytics data
+            const analyticsQuery = await db
+                .collection(`users/${userId}/analytics`)
+                .get();
+            const recommendations = [];
+            const currentDate = new Date();
+            analyticsQuery.forEach((doc) => {
+                const exerciseName = doc.id;
+                const data = doc.data();
+                // Calculate days since last update
+                const lastUpdated = new Date(data.lastUpdated);
+                const daysSinceLastWorkout = Math.ceil((currentDate.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
+                // Recommend if it's been longer than average frequency
+                if (daysSinceLastWorkout >= data.averageFrequency) {
+                    const urgencyScore = daysSinceLastWorkout / data.averageFrequency;
+                    recommendations.push({
+                        exercise: exerciseName,
+                        averageFrequency: data.averageFrequency,
+                        daysSinceLastWorkout,
+                        urgencyScore,
+                        lastUpdated: data.lastUpdated,
+                        recommendation: urgencyScore > 1.5 ? 'urgent' : 'suggested'
+                    });
+                }
+            });
+            // Sort by urgency score (highest first)
+            recommendations.sort((a, b) => b.urgencyScore - a.urgencyScore);
+            firebase_functions_1.logger.info(`Found ${recommendations.length} recommendations for user ${userId}`);
+            response.json({
+                userId,
+                recommendations,
+                generatedAt: currentDate.toISOString()
+            });
+        }
+        catch (error) {
+            firebase_functions_1.logger.error('Error getting training recommendations:', error);
+            response.status(500).json({
+                error: 'Internal server error',
+                message: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    });
 });
 //# sourceMappingURL=index.js.map

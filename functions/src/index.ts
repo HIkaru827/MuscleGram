@@ -1,7 +1,9 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onRequest } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
+import cors from "cors";
 
 // Initialize Firebase Admin
 initializeApp();
@@ -140,5 +142,90 @@ export const calculateTrainingFrequency = onDocumentCreated(
       logger.error("Error calculating training frequency:", error);
       throw error;
     }
+  }
+);
+
+// CORS configuration
+const corsHandler = cors({
+  origin: [
+    'https://musclegram.net',
+    'https://www.musclegram.net',
+    'https://musclegram-app.vercel.app',
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+});
+
+/**
+ * Get training recommendations based on user's analytics data
+ */
+export const getTrainingRecommendations = onRequest(
+  { cors: true },
+  async (request, response) => {
+    return corsHandler(request, response, async () => {
+      try {
+        const userId = request.query.userId as string;
+        
+        if (!userId) {
+          response.status(400).json({ error: 'userId is required' });
+          return;
+        }
+
+        logger.info(`Getting training recommendations for user: ${userId}`);
+
+        // Get user's analytics data
+        const analyticsQuery = await db
+          .collection(`users/${userId}/analytics`)
+          .get();
+
+        const recommendations: any[] = [];
+        const currentDate = new Date();
+
+        analyticsQuery.forEach((doc) => {
+          const exerciseName = doc.id;
+          const data = doc.data() as AnalyticsData;
+          
+          // Calculate days since last update
+          const lastUpdated = new Date(data.lastUpdated);
+          const daysSinceLastWorkout = Math.ceil(
+            (currentDate.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          // Recommend if it's been longer than average frequency
+          if (daysSinceLastWorkout >= data.averageFrequency) {
+            const urgencyScore = daysSinceLastWorkout / data.averageFrequency;
+            
+            recommendations.push({
+              exercise: exerciseName,
+              averageFrequency: data.averageFrequency,
+              daysSinceLastWorkout,
+              urgencyScore,
+              lastUpdated: data.lastUpdated,
+              recommendation: urgencyScore > 1.5 ? 'urgent' : 'suggested'
+            });
+          }
+        });
+
+        // Sort by urgency score (highest first)
+        recommendations.sort((a, b) => b.urgencyScore - a.urgencyScore);
+
+        logger.info(`Found ${recommendations.length} recommendations for user ${userId}`);
+
+        response.json({
+          userId,
+          recommendations,
+          generatedAt: currentDate.toISOString()
+        });
+
+      } catch (error) {
+        logger.error('Error getting training recommendations:', error);
+        response.status(500).json({ 
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
   }
 );

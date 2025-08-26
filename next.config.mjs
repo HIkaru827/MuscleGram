@@ -29,7 +29,7 @@ const nextConfig = {
     return [
       {
         source: '/api/functions/:path*',
-        destination: 'https://asia-northeast1-musclegram-app.cloudfunctions.net/:path*'
+        destination: 'https://us-central1-musclegram-d5b32.cloudfunctions.net/:path*'
       }
     ]
   },
