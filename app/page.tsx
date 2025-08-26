@@ -57,6 +57,9 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   const [activeScreen, setActiveScreen] = useState<Screen>(defaultScreen)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
+  // Debug logging
+  console.log('FitnessApp render:', { user: user?.uid, loading, isInitialLoad })
+
   // URLパスからスクリーンを決定する関数
   const getScreenFromPath = (path: string): Screen => {
     if (path === '/home') return 'home'
@@ -106,7 +109,11 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   React.useEffect(() => {
     if (!loading) {
       // Delay to ensure DOM is painted
-      setTimeout(() => setIsInitialLoad(false), 100)
+      const timer = setTimeout(() => {
+        setIsInitialLoad(false)
+        console.log('Initial load completed, isInitialLoad set to false')
+      }, 500)
+      return () => clearTimeout(timer)
     }
   }, [loading])
 

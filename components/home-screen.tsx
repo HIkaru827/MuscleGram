@@ -20,6 +20,8 @@ export default function HomeScreen() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<WorkoutPostType[]>([])
   const [loading, setLoading] = useState(true)
+  
+  console.log('HomeScreen render:', { user: user?.uid, posts: posts.length, loading })
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [postToDelete, setPostToDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
