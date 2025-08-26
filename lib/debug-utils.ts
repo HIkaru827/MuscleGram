@@ -166,19 +166,19 @@ class ProductionDebugger {
 }
 
 // Global instance
-export const debugger = new ProductionDebugger()
+export const productionDebugger = new ProductionDebugger()
 
 // Helper functions for components
 export const logAuthEvent = (event: string, data?: any) => {
-  debugger.log(`AUTH: ${event}`, data)
+  productionDebugger.log(`AUTH: ${event}`, data)
 }
 
 export const logAppEvent = (event: string, data?: any) => {
-  debugger.log(`APP: ${event}`, data)
+  productionDebugger.log(`APP: ${event}`, data)
 }
 
 export const logError = (error: string, details?: any) => {
-  debugger.log(`ERROR: ${error}`, details)
+  productionDebugger.log(`ERROR: ${error}`, details)
   
   // In production, you might want to send this to an error tracking service
   if (process.env.NODE_ENV === 'production') {
@@ -190,13 +190,13 @@ export const logError = (error: string, details?: any) => {
 // Component hook for debugging
 export const useDebugger = () => {
   return {
-    log: debugger.log.bind(debugger),
+    log: productionDebugger.log.bind(productionDebugger),
     logAuth: logAuthEvent,
     logApp: logAppEvent,
     logError,
-    getDebugInfo: debugger.getDebugInfo.bind(debugger),
-    exportData: debugger.exportDebugData.bind(debugger),
-    markAuthResolution: debugger.markAuthResolution.bind(debugger),
-    markFirstRender: debugger.markFirstRender.bind(debugger)
+    getDebugInfo: productionDebugger.getDebugInfo.bind(productionDebugger),
+    exportData: productionDebugger.exportDebugData.bind(productionDebugger),
+    markAuthResolution: productionDebugger.markAuthResolution.bind(productionDebugger),
+    markFirstRender: productionDebugger.markFirstRender.bind(productionDebugger)
   }
 }

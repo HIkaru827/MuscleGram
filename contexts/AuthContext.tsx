@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
-import { logAuthEvent, logError, debugger } from '@/lib/debug-utils'
+import { logAuthEvent, logError, productionDebugger } from '@/lib/debug-utils'
 
 interface UserProfile {
   uid: string
@@ -343,7 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setLoading(false)
         setInitialized(true)
-        debugger.markAuthResolution()
+        productionDebugger.markAuthResolution()
       })
 
       return () => {
