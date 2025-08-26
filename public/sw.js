@@ -1,4 +1,4 @@
-const CACHE_NAME = 'musclegram-v1'
+const CACHE_NAME = 'musclegram-v2'
 const urlsToCache = [
   '/',
   '/icon-192.svg',
@@ -33,6 +33,14 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event
 self.addEventListener('fetch', (event) => {
+  // Skip service worker for API requests to avoid CORS issues
+  if (event.request.url.includes('cloudfunctions.net') || 
+      event.request.url.includes('googleapis.com') ||
+      event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request))
+    return
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -41,6 +49,20 @@ self.addEventListener('fetch', (event) => {
           return response
         }
         return fetch(event.request)
+      })
+      .catch((error) => {
+        console.error('Service Worker fetch error:', error)
+        // Fallback to network request if cache fails
+        return fetch(event.request).catch(() => {
+          // If both cache and network fail, return offline page or error response
+          if (event.request.destination === 'document') {
+            return new Response(
+              '<!DOCTYPE html><html><head><title>オフライン</title></head><body><h1>オフラインです</h1><p>インターネット接続を確認してください。</p></body></html>',
+              { headers: { 'Content-Type': 'text/html' } }
+            )
+          }
+          return new Response('Network Error', { status: 408 })
+        })
       })
   )
 })
