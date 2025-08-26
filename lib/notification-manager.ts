@@ -1,5 +1,3 @@
-"use client"
-
 interface NotificationSettings {
   enabled: boolean
   time: string // HH:MM format (24-hour)
