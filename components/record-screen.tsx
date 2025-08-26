@@ -621,19 +621,31 @@ export default function RecordScreen() {
 
     return (
       <div className="max-w-2xl mx-auto p-4 pb-24">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">ワークアウト中</h2>
-            {recordMode === 'manual' && recordDate && (
-              <p className="text-sm text-gray-600 mt-1">
-                記録日: {recordDate}
-              </p>
-            )}
+        {/* ヘッダー部分 */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">ワークアウト中</h2>
+              {recordMode === 'manual' && recordDate && (
+                <p className="text-sm text-gray-600 mt-1">
+                  記録日: {recordDate}
+                </p>
+              )}
+            </div>
+            <Button 
+              onClick={finishWorkout} 
+              disabled={recordMode === 'manual' && !isValidManualTime()}
+              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-300 shrink-0"
+            >
+              完了
+            </Button>
           </div>
-          <div className="flex items-center space-x-4">
+
+          {/* タイマー・時間入力部分を分離 */}
+          <div className="bg-gray-50 rounded-lg p-4">
             {recordMode === 'live' ? (
               // ライブ記録モード: ストップウォッチ表示
-              <>
+              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-red-600">
                   <Clock className="w-5 h-5" />
                   <span className="font-medium font-mono text-lg">{workoutDuration}</span>
@@ -646,55 +658,52 @@ export default function RecordScreen() {
                   <Clock className="w-4 h-4 mr-1" />
                   タイマー
                 </Button>
-              </>
+              </div>
             ) : (
               // 手動記録モード: 時間入力フォーム
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="startTime" className="text-sm text-gray-600">開始:</Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    value={manualTimeInput.startTime}
-                    onChange={(e) => setManualTimeInput(prev => ({ ...prev, startTime: e.target.value }))}
-                    className="w-24"
-                    size="sm"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="endTime" className="text-sm text-gray-600">終了:</Label>
-                  <Input
-                    id="endTime"
-                    type="time"
-                    value={manualTimeInput.endTime}
-                    onChange={(e) => setManualTimeInput(prev => ({ ...prev, endTime: e.target.value }))}
-                    className="w-24"
-                    size="sm"
-                  />
-                </div>
-                {isValidManualTime() && (
-                  <div className="flex items-center space-x-2 text-blue-600">
-                    <Clock className="w-4 h-4" />
-                    <span className="font-medium text-sm">{calculateManualDuration()}分</span>
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="startTime" className="text-sm text-gray-600 w-12">開始:</Label>
+                    <Input
+                      id="startTime"
+                      type="time"
+                      value={manualTimeInput.startTime}
+                      onChange={(e) => setManualTimeInput(prev => ({ ...prev, startTime: e.target.value }))}
+                      className="w-32"
+                      size="sm"
+                    />
                   </div>
-                )}
-                <Button 
-                  onClick={() => setShowTimerDialog(true)} 
-                  variant="outline"
-                  size="sm"
-                >
-                  <Clock className="w-4 h-4 mr-1" />
-                  タイマー
-                </Button>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="endTime" className="text-sm text-gray-600 w-12">終了:</Label>
+                    <Input
+                      id="endTime"
+                      type="time"
+                      value={manualTimeInput.endTime}
+                      onChange={(e) => setManualTimeInput(prev => ({ ...prev, endTime: e.target.value }))}
+                      className="w-32"
+                      size="sm"
+                    />
+                  </div>
+                  {isValidManualTime() && (
+                    <div className="flex items-center space-x-2 text-blue-600">
+                      <Clock className="w-4 h-4" />
+                      <span className="font-medium text-sm">{calculateManualDuration()}分</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={() => setShowTimerDialog(true)} 
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Clock className="w-4 h-4 mr-1" />
+                    タイマー
+                  </Button>
+                </div>
               </div>
             )}
-            <Button 
-              onClick={finishWorkout} 
-              disabled={recordMode === 'manual' && !isValidManualTime()}
-              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-300"
-            >
-              完了
-            </Button>
           </div>
         </div>
 
@@ -977,31 +986,36 @@ export default function RecordScreen() {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">ワークアウト記録</h2>
-          <div className="flex items-center space-x-3 mt-2">
-            {recordMode === 'manual' && (
-              <Badge variant="secondary" className="text-xs">
-                📝 手動記録
-              </Badge>
-            )}
-            {recordMode === 'manual' && recordDate && (
-              <span className="text-sm text-gray-600">対象日: {recordDate}</span>
-            )}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">ワークアウト記録</h2>
+            <div className="flex flex-wrap items-center gap-3 mt-2">
+              {recordMode === 'manual' && (
+                <Badge variant="secondary" className="text-xs">
+                  📝 手動記録
+                </Badge>
+              )}
+              {recordMode === 'manual' && recordDate && (
+                <span className="text-sm text-gray-600">対象日: {recordDate}</span>
+              )}
+            </div>
           </div>
+          <Button onClick={startWorkout} className="bg-red-600 hover:bg-red-700 shrink-0">
+            <Play className="mr-2 h-4 w-4" />
+            開始
+          </Button>
         </div>
-        <div className="flex space-x-2">
+        
+        {/* 追加ボタンを分離 */}
+        <div className="flex justify-center">
           <Button 
             variant="outline"
             onClick={() => setShowAddGroup(true)}
+            className="w-full sm:w-auto"
           >
             <Plus className="mr-2 h-4 w-4" />
             部位追加
-          </Button>
-          <Button onClick={startWorkout} className="bg-red-600 hover:bg-red-700">
-            <Play className="mr-2 h-4 w-4" />
-            開始
           </Button>
         </div>
       </div>
