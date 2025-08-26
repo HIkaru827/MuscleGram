@@ -24,7 +24,7 @@ import { uploadImage, validateImageFile, compressImage } from "@/lib/storage"
 import NotificationSettings from "./notification-settings"
 
 export default function ProfileScreen() {
-  const { user, userProfile, logout } = useAuth()
+  const { user, userProfile, logout, refreshUserProfile, clearPWACache } = useAuth()
   const [userPosts, setUserPosts] = useState<WorkoutPost[]>([])
   const [loading, setLoading] = useState(true)
   const [editingProfile, setEditingProfile] = useState(false)
@@ -129,6 +129,10 @@ export default function ProfileScreen() {
 
       toast.success("プロフィールを更新しました")
       setEditingProfile(false)
+      
+      // Force refresh user profile and clear PWA cache
+      await refreshUserProfile()
+      await clearPWACache()
     } catch (error) {
       console.error('Error updating profile:', error)
       toast.error("プロフィールの更新に失敗しました")
@@ -171,6 +175,10 @@ export default function ProfileScreen() {
       console.log('Profile update completed')
 
       toast.success("プロフィール写真を更新しました")
+      
+      // Force refresh user profile and clear PWA cache
+      await refreshUserProfile()
+      await clearPWACache()
     } catch (error: any) {
       console.error('Photo upload error details:', {
         message: error.message,

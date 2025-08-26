@@ -12,7 +12,7 @@ import {
   signInAnonymously,
   updateProfile
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 
 interface UserProfile {
@@ -37,6 +37,8 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   signInAsGuest: () => Promise<void>
   logout: () => Promise<void>
+  refreshUserProfile: () => Promise<void>
+  clearPWACache: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -213,9 +215,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signOut(auth)
       setUserProfile(null)
+      // Clear PWA cache on logout
+      await clearPWACache()
     } catch (error) {
       console.error('Logout error:', error)
       throw error
+    }
+  }
+
+  // Refresh user profile from Firestore
+  const refreshUserProfile = async () => {
+    if (!user) return
+    
+    try {
+      const userRef = doc(db, 'users', user.uid)
+      const userSnap = await getDoc(userRef)
+      
+      if (userSnap.exists()) {
+        const newProfile = { uid: user.uid, ...userSnap.data() } as UserProfile
+        setUserProfile(newProfile)
+        
+        // Clear browser cache to ensure PWA gets latest data
+        await clearPWACache()
+      }
+    } catch (error) {
+      console.error('Error refreshing user profile:', error)
+    }
+  }
+
+  // Clear PWA cache and force refresh
+  const clearPWACache = async () => {
+    if (typeof window === 'undefined') return
+    
+    try {
+      // Clear all caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        )
+        console.log('PWA cache cleared')
+      }
+      
+      // Reload service worker if available
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CACHE_REFRESH' })
+      }
+      
+      // Force page reload in standalone mode (PWA)
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('Error clearing PWA cache:', error)
     }
   }
 
@@ -256,6 +308,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user) {
           setUser(user)
           await createUserProfile(user)
+          
+          // Set up real-time listener for user profile updates
+          const userRef = doc(db, 'users', user.uid)
+          const unsubscribeProfile = onSnapshot(userRef, (doc) => {
+            if (doc.exists()) {
+              const newProfile = { uid: user.uid, ...doc.data() } as UserProfile
+              setUserProfile(newProfile)
+              console.log('Profile updated in real-time:', newProfile.displayName)
+            }
+          }, (error) => {
+            console.error('Error listening to profile updates:', error)
+          })
+          
+          // Store unsubscribe function for cleanup
+          return unsubscribeProfile
         } else {
           setUser(null)
           setUserProfile(null)
@@ -279,6 +346,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     signInAsGuest,
     logout,
+    refreshUserProfile,
+    clearPWACache,
   }
 
   return (

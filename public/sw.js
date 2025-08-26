@@ -109,6 +109,25 @@ self.addEventListener('message', (event) => {
       })
     }, duration * 1000)
   }
+
+  if (event.data && event.data.type === 'CACHE_REFRESH') {
+    // Clear all caches and reload
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          console.log('Deleting cache:', cacheName)
+          return caches.delete(cacheName)
+        })
+      )
+    }).then(() => {
+      console.log('All caches cleared, reloading clients')
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'CACHE_CLEARED' })
+        })
+      })
+    })
+  }
 })
 
 // Handle notification click
