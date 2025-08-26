@@ -1,6 +1,6 @@
 // Cloud Functions の warm-up 用ユーティリティ
 
-const FUNCTIONS_BASE_URL = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_URL || 'https://asia-northeast1-musclegram-app.cloudfunctions.net'
+const FUNCTIONS_BASE_URL = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_URL || 'https://us-central1-musclegram-d5b32.cloudfunctions.net'
 
 const FUNCTIONS_TO_WARM = [
   'getTrainingRecommendations',

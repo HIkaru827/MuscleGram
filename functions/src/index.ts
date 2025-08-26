@@ -229,3 +229,134 @@ export const getTrainingRecommendations = onRequest(
     });
   }
 );
+
+/**
+ * Calculate workout frequency for a user
+ */
+export const calculateWorkoutFrequency = onRequest(
+  { cors: true },
+  async (request, response) => {
+    return corsHandler(request, response, async () => {
+      try {
+        const userId = request.body?.userId || request.query.userId as string;
+        
+        if (!userId) {
+          response.status(400).json({ error: 'userId is required' });
+          return;
+        }
+
+        // Handle warmup requests
+        if (request.body?.warmup) {
+          response.json({ status: 'warmed up', function: 'calculateWorkoutFrequency' });
+          return;
+        }
+
+        logger.info(`Calculating workout frequency for user: ${userId}`);
+
+        // Get user's workout posts
+        const postsQuery = await db
+          .collection('workout_posts')
+          .where('userId', '==', userId)
+          .orderBy('createdAt', 'desc')
+          .limit(50)
+          .get();
+
+        const workouts = postsQuery.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate?.() || new Date(doc.data().createdAt)
+        }));
+
+        if (workouts.length < 2) {
+          response.json({
+            userId,
+            frequency: 0,
+            totalWorkouts: workouts.length,
+            message: 'Not enough data to calculate frequency'
+          });
+          return;
+        }
+
+        // Calculate average frequency between workouts
+        const dates = workouts.map(w => new Date(w.createdAt).getTime()).sort((a, b) => a - b);
+        const intervals = [];
+        
+        for (let i = 1; i < dates.length; i++) {
+          const intervalDays = (dates[i] - dates[i-1]) / (1000 * 60 * 60 * 24);
+          intervals.push(intervalDays);
+        }
+
+        const averageFrequency = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+
+        response.json({
+          userId,
+          frequency: Math.round(averageFrequency * 10) / 10,
+          totalWorkouts: workouts.length,
+          intervals,
+          calculatedAt: new Date().toISOString()
+        });
+
+      } catch (error) {
+        logger.error('Error calculating workout frequency:', error);
+        response.status(500).json({ 
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+  }
+);
+
+/**
+ * Get workout analytics for a user
+ */
+export const getWorkoutAnalytics = onRequest(
+  { cors: true },
+  async (request, response) => {
+    return corsHandler(request, response, async () => {
+      try {
+        const userId = request.query.userId as string;
+        
+        if (!userId) {
+          response.status(400).json({ error: 'userId is required' });
+          return;
+        }
+
+        // Handle warmup requests
+        if (request.body?.warmup) {
+          response.json({ status: 'warmed up', function: 'getWorkoutAnalytics' });
+          return;
+        }
+
+        logger.info(`Getting workout analytics for user: ${userId}`);
+
+        // Get user's analytics data
+        const analyticsQuery = await db
+          .collection(`users/${userId}/analytics`)
+          .get();
+
+        const analytics: any[] = [];
+        analyticsQuery.forEach((doc) => {
+          analytics.push({
+            exercise: doc.id,
+            ...doc.data()
+          });
+        });
+
+        response.json({
+          userId,
+          analytics,
+          totalExercises: analytics.length,
+          generatedAt: new Date().toISOString()
+        });
+
+      } catch (error) {
+        logger.error('Error getting workout analytics:', error);
+        response.status(500).json({ 
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+  }
+);

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTrainingRecommendations = exports.calculateTrainingFrequency = void 0;
+exports.getWorkoutAnalytics = exports.calculateWorkoutFrequency = exports.getTrainingRecommendations = exports.calculateTrainingFrequency = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
@@ -171,6 +171,111 @@ exports.getTrainingRecommendations = (0, https_1.onRequest)({ cors: true }, asyn
         }
         catch (error) {
             firebase_functions_1.logger.error('Error getting training recommendations:', error);
+            response.status(500).json({
+                error: 'Internal server error',
+                message: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    });
+});
+/**
+ * Calculate workout frequency for a user
+ */
+exports.calculateWorkoutFrequency = (0, https_1.onRequest)({ cors: true }, async (request, response) => {
+    return corsHandler(request, response, async () => {
+        var _a, _b;
+        try {
+            const userId = ((_a = request.body) === null || _a === void 0 ? void 0 : _a.userId) || request.query.userId;
+            if (!userId) {
+                response.status(400).json({ error: 'userId is required' });
+                return;
+            }
+            // Handle warmup requests
+            if ((_b = request.body) === null || _b === void 0 ? void 0 : _b.warmup) {
+                response.json({ status: 'warmed up', function: 'calculateWorkoutFrequency' });
+                return;
+            }
+            firebase_functions_1.logger.info(`Calculating workout frequency for user: ${userId}`);
+            // Get user's workout posts
+            const postsQuery = await db
+                .collection('workout_posts')
+                .where('userId', '==', userId)
+                .orderBy('createdAt', 'desc')
+                .limit(50)
+                .get();
+            const workouts = postsQuery.docs.map(doc => {
+                var _a, _b;
+                return (Object.assign(Object.assign({ id: doc.id }, doc.data()), { createdAt: ((_b = (_a = doc.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) || new Date(doc.data().createdAt) }));
+            });
+            if (workouts.length < 2) {
+                response.json({
+                    userId,
+                    frequency: 0,
+                    totalWorkouts: workouts.length,
+                    message: 'Not enough data to calculate frequency'
+                });
+                return;
+            }
+            // Calculate average frequency between workouts
+            const dates = workouts.map(w => new Date(w.createdAt).getTime()).sort((a, b) => a - b);
+            const intervals = [];
+            for (let i = 1; i < dates.length; i++) {
+                const intervalDays = (dates[i] - dates[i - 1]) / (1000 * 60 * 60 * 24);
+                intervals.push(intervalDays);
+            }
+            const averageFrequency = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+            response.json({
+                userId,
+                frequency: Math.round(averageFrequency * 10) / 10,
+                totalWorkouts: workouts.length,
+                intervals,
+                calculatedAt: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            firebase_functions_1.logger.error('Error calculating workout frequency:', error);
+            response.status(500).json({
+                error: 'Internal server error',
+                message: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    });
+});
+/**
+ * Get workout analytics for a user
+ */
+exports.getWorkoutAnalytics = (0, https_1.onRequest)({ cors: true }, async (request, response) => {
+    return corsHandler(request, response, async () => {
+        var _a;
+        try {
+            const userId = request.query.userId;
+            if (!userId) {
+                response.status(400).json({ error: 'userId is required' });
+                return;
+            }
+            // Handle warmup requests
+            if ((_a = request.body) === null || _a === void 0 ? void 0 : _a.warmup) {
+                response.json({ status: 'warmed up', function: 'getWorkoutAnalytics' });
+                return;
+            }
+            firebase_functions_1.logger.info(`Getting workout analytics for user: ${userId}`);
+            // Get user's analytics data
+            const analyticsQuery = await db
+                .collection(`users/${userId}/analytics`)
+                .get();
+            const analytics = [];
+            analyticsQuery.forEach((doc) => {
+                analytics.push(Object.assign({ exercise: doc.id }, doc.data()));
+            });
+            response.json({
+                userId,
+                analytics,
+                totalExercises: analytics.length,
+                generatedAt: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            firebase_functions_1.logger.error('Error getting workout analytics:', error);
             response.status(500).json({
                 error: 'Internal server error',
                 message: error instanceof Error ? error.message : 'Unknown error'
