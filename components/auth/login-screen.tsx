@@ -110,7 +110,7 @@ export default function LoginScreen({ onClose }: LoginScreenProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-24 h-24 flex items-center justify-center">
@@ -229,7 +229,7 @@ export default function LoginScreen({ onClose }: LoginScreenProps) {
 
             <Button
               type="submit"
-              className="w-full bg-red-600 hover:bg-red-700"
+              className="w-full bg-red-500 hover:bg-red-600"
               disabled={loading}
             >
               {loading ? (

@@ -58,7 +58,7 @@ export default function PWAInstallPrompt() {
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <h3 className="font-semibold text-red-800">MuscleGramをインストール</h3>
+            <h3 className="font-semibold text-red-700">MuscleGramをインストール</h3>
             <p className="text-sm text-red-600">
               ホーム画面に追加してより快適にご利用いただけます
             </p>
@@ -67,7 +67,7 @@ export default function PWAInstallPrompt() {
             <Button 
               size="sm"
               onClick={handleInstall}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-500 hover:bg-red-600"
             >
               <Download className="w-4 h-4 mr-1" />
               インストール
