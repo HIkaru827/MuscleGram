@@ -295,10 +295,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Delay Firebase initialization to prioritize initial render
     const delayedInit = setTimeout(() => {
-      // Check if we're in demo mode
-      const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+      // Check if we're in demo mode or missing environment variables
+      const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key' || 
+                         !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+      
+      console.log('AuthContext initialization:', {
+        isDemoMode,
+        hasApiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        apiKeyValue: process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+      })
       
       if (isDemoMode) {
+        console.log('Demo mode detected - creating mock user')
+        
         // In demo mode, create a mock user to show UI
         const mockUser = {
           uid: 'demo-user',
@@ -322,6 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         setLoading(false)
         setInitialized(true)
+        productionDebugger.markAuthResolution()
         return
       }
 

@@ -239,13 +239,36 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
             Muscle<span className="text-red-500">Gram</span>
           </h1>
-          <p className="text-gray-600 mb-6">認証に時間がかかっています。再試行してください。</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-colors"
-          >
-            再読み込み
-          </button>
+          <div className="mb-6 space-y-2">
+            <p className="text-gray-600">設定に問題があります</p>
+            <p className="text-sm text-gray-500">
+              Firebase環境変数が設定されていない可能性があります
+            </p>
+          </div>
+          <div className="space-y-3">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-colors"
+            >
+              再読み込み
+            </button>
+            <button 
+              onClick={() => {
+                const debugInfo = {
+                  timestamp: new Date().toISOString(),
+                  url: window.location.href,
+                  userAgent: navigator.userAgent,
+                  hasFirebaseConfig: !!(window as any).firebase,
+                  localStorage: Object.keys(localStorage),
+                }
+                console.log('Debug Info:', debugInfo)
+                alert('デバッグ情報がコンソールに出力されました')
+              }}
+              className="w-full bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors text-sm"
+            >
+              デバッグ情報を表示
+            </button>
+          </div>
         </div>
       </div>
     )

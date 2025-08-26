@@ -1,4 +1,4 @@
-const CACHE_NAME = 'musclegram-v4'
+const CACHE_NAME = 'musclegram-v5'
 const urlsToCache = [
   '/',
   '/icon-192x192.png',
@@ -46,6 +46,9 @@ self.addEventListener('fetch', (event) => {
       event.request.url.includes('gstatic.com') ||
       event.request.url.includes('accounts.google.com') ||
       event.request.url.includes('firebaseio.com') ||
+      event.request.url.includes('google.com') ||
+      event.request.url.includes('google-analytics.com') ||
+      event.request.url.includes('googletagmanager.com') ||
       event.request.url.includes('/api/') ||
       event.request.url.includes('_next/webpack-hmr') ||
       event.request.url.includes('_next/static/chunks/webpack.js') ||

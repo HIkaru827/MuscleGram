@@ -21,6 +21,13 @@ const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key' |
 
 if (isDemoMode) {
   console.warn('Running in demo mode or missing Firebase config. Firebase services will not work properly.')
+  console.log('Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    hasApiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.substring(0, 10) + '...',
+    hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  })
 }
 
 // Only initialize Firebase if not in demo mode and we have valid config
