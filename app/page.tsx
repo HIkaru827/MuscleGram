@@ -12,28 +12,59 @@ import dynamic from "next/dynamic"
 import { useDebugger } from "@/lib/debug-utils"
 import { usePerformanceMonitor } from "@/lib/performance-monitor"
 
-// Revert to safer dynamic imports with error handling
-const HomeScreen = dynamic(() => import('@/components/home-screen'), {
+// Dynamic imports with chunk error handling
+const HomeScreen = dynamic(() => import('@/components/home-screen').catch(error => {
+  console.error('Failed to load HomeScreen:', error)
+  // Fallback to reload if chunk loading fails
+  if (error.name === 'ChunkLoadError') {
+    window.location.reload()
+  }
+  throw error
+}), {
   loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
   ssr: false
 })
 
-const RecordScreen = dynamic(() => import('@/components/record-screen'), {
+const RecordScreen = dynamic(() => import('@/components/record-screen').catch(error => {
+  console.error('Failed to load RecordScreen:', error)
+  if (error.name === 'ChunkLoadError') {
+    window.location.reload()
+  }
+  throw error
+}), {
   loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
   ssr: false
 })
 
-const AnalyticsScreen = dynamic(() => import('@/components/analytics-screen'), {
+const AnalyticsScreen = dynamic(() => import('@/components/analytics-screen').catch(error => {
+  console.error('Failed to load AnalyticsScreen:', error)
+  if (error.name === 'ChunkLoadError') {
+    window.location.reload()
+  }
+  throw error
+}), {
   loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
   ssr: false
 })
 
-const CommunityScreen = dynamic(() => import('@/components/community-screen'), {
+const CommunityScreen = dynamic(() => import('@/components/community-screen').catch(error => {
+  console.error('Failed to load CommunityScreen:', error)
+  if (error.name === 'ChunkLoadError') {
+    window.location.reload()
+  }
+  throw error
+}), {
   loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
   ssr: false
 })
 
-const ProfileScreen = dynamic(() => import('@/components/profile-screen'), {
+const ProfileScreen = dynamic(() => import('@/components/profile-screen').catch(error => {
+  console.error('Failed to load ProfileScreen:', error)
+  if (error.name === 'ChunkLoadError') {
+    window.location.reload()
+  }
+  throw error
+}), {
   loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded"></div>,
   ssr: false
 })

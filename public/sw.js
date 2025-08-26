@@ -1,6 +1,6 @@
-const CACHE_NAME = 'musclegram-v6'
-const STATIC_CACHE = 'static-v6'
-const DYNAMIC_CACHE = 'dynamic-v6'
+const CACHE_NAME = 'musclegram-v7'
+const STATIC_CACHE = 'static-v7'
+const DYNAMIC_CACHE = 'dynamic-v7'
 
 // Critical resources that should be cached immediately
 const urlsToCache = [
@@ -113,6 +113,16 @@ async function fetchAndCache(request) {
     const response = await fetchWithTimeout(request, 5000)
     
     if (response.ok && shouldCache(request)) {
+      // Fix MIME type issues
+      const contentType = response.headers.get('content-type')
+      const url = request.url
+      
+      // Skip caching if MIME type doesn't match expected file type
+      if (url.endsWith('.js') && contentType && !contentType.includes('javascript') && !contentType.includes('text/javascript')) {
+        console.warn('MIME type mismatch for JS file:', url, contentType)
+        return response
+      }
+      
       const cache = await caches.open(DYNAMIC_CACHE)
       cache.put(request, response.clone())
     }
@@ -125,6 +135,14 @@ async function fetchAndCache(request) {
 
 function shouldCache(request) {
   const url = request.url
+  
+  // Skip caching for problematic URLs
+  if (url.includes('bundle-optimizer') || 
+      url.includes('lib/bundle-optimizer') ||
+      url.includes('chunk') && url.includes('failed')) {
+    return false
+  }
+  
   return dynamicCacheUrls.some(pattern => url.includes(pattern)) ||
          request.destination === 'image' ||
          request.destination === 'style' ||

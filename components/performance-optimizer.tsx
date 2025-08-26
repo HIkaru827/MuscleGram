@@ -73,9 +73,46 @@ export default function PerformanceOptimizer() {
       optimizeImages()
     }, 100)
     
+    // Clear problematic caches on app load
+    const clearProblematicCaches = async () => {
+      if ('serviceWorker' in navigator && 'caches' in window) {
+        try {
+          const cacheNames = await caches.keys()
+          
+          // Delete any old cache versions
+          const oldCaches = cacheNames.filter(name => 
+            name.includes('musclegram') && !name.includes('v7')
+          )
+          
+          await Promise.all(
+            oldCaches.map(cacheName => {
+              console.log('Clearing old cache:', cacheName)
+              return caches.delete(cacheName)
+            })
+          )
+          
+          // Send cache refresh message to service worker
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'CACHE_REFRESH'
+            })
+          }
+          
+        } catch (error) {
+          console.warn('Cache clearing failed:', error)
+        }
+      }
+    }
+    
+    // Clear problematic caches after a short delay
+    const cacheCleanupTimer = setTimeout(() => {
+      clearProblematicCaches()
+    }, 1000)
+    
     // Cleanup
     return () => {
       clearTimeout(imageOptimizationTimer)
+      clearTimeout(cacheCleanupTimer)
     }
   }, [])
 
