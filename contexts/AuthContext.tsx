@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false)
 
   const createUserProfile = async (user: User, additionalData?: any) => {
-    if (!user) return
+    if (!user || !db) return
 
     const userRef = doc(db, 'users', user.uid)
     const userSnap = await getDoc(userRef)
@@ -95,6 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+    
     try {
       const result = await signInWithEmailAndPassword(auth, email, password)
       await createUserProfile(result.user)
@@ -105,6 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signUp = async (email: string, password: string, displayName: string) => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+    
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password)
       await updateProfile(result.user, { displayName })
@@ -116,6 +124,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInWithGoogle = async () => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+    
     // Check if we're in demo mode
     const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
     
@@ -174,6 +186,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInAsGuest = async () => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+    
     // Check if we're in demo mode
     const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
     
@@ -213,6 +229,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+    
     try {
       await signOut(auth)
       setUserProfile(null)
@@ -226,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Refresh user profile from Firestore
   const refreshUserProfile = async () => {
-    if (!user) return
+    if (!user || !db) return
     
     try {
       const userRef = doc(db, 'users', user.uid)
@@ -314,7 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }, 8000) // 8 second timeout for auth initialization
 
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const unsubscribe = auth ? onAuthStateChanged(auth, async (user) => {
         clearTimeout(authTimeout) // Clear timeout if auth state changes
         
         logAuthEvent('Auth state changed', { hasUser: !!user, uid: user?.uid })
@@ -344,10 +364,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
         setInitialized(true)
         productionDebugger.markAuthResolution()
-      })
+      }) : () => {
+        // If auth is not available, set loading to false immediately
+        setLoading(false)
+        setInitialized(true)
+        productionDebugger.markAuthResolution()
+      }
 
       return () => {
-        unsubscribe()
+        if (unsubscribe) unsubscribe()
         clearTimeout(authTimeout) // Clean up auth timeout
       }
     }, 50) // 50ms delay to allow skeleton render first

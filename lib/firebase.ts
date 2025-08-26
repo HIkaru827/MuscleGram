@@ -4,30 +4,47 @@ import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getAnalytics } from 'firebase/analytics'
 
+// Firebase configuration with fallback values for build process
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'demo-api-key',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'demo.firebaseapp.com',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'demo-project.appspot.com',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123456789',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:123456789:web:demo',
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || 'G-DEMO',
 }
 
-// Check if we're in demo mode
-const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key'
+// Check if we're in demo mode or missing environment variables
+const isDemoMode = process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key' || 
+                   !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
 
 if (isDemoMode) {
-  console.warn('Running in demo mode. Firebase services will not work. Please configure your Firebase project.')
+  console.warn('Running in demo mode or missing Firebase config. Firebase services will not work properly.')
 }
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
+// Only initialize Firebase if not in demo mode and we have valid config
+let app: any = null
 
-// Initialize Firebase services
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-export const storage = getStorage(app)
+try {
+  if (!isDemoMode && typeof window !== 'undefined') {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
+  } else if (!isDemoMode) {
+    // For SSR/build time, create a minimal app
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
+  } else {
+    // In demo mode, create a dummy app to prevent initialization errors
+    console.log('Skipping Firebase initialization in demo mode')
+  }
+} catch (error) {
+  console.error('Firebase initialization error:', error)
+  // Create minimal config to prevent build failures
+}
+
+// Initialize Firebase services with error handling
+export const auth = app ? getAuth(app) : null
+export const db = app ? getFirestore(app) : null
+export const storage = app ? getStorage(app) : null
 
 // Initialize Analytics lazily
 let analytics: any = null
