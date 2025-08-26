@@ -12,36 +12,12 @@ import { NotificationManager } from "@/lib/notification-manager"
 import dynamic from "next/dynamic"
 import { useDebugger } from "@/lib/debug-utils"
 
-const HomeScreen = dynamic(() => import("@/components/home-screen"), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-500 border-t-transparent" /></div>
-})
-
-const RecordScreen = dynamic(() => import("@/components/record-screen"), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-500 border-t-transparent" /></div>
-})
-
-const AnalyticsScreen = dynamic(() => import("@/components/analytics-screen"), {
-  ssr: false,
-  loading: () => (
-    <div className="p-4 space-y-4">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-white border rounded-lg p-4 skeleton-box h-24"></div>
-      ))}
-    </div>
-  )
-})
-
-const CommunityScreen = dynamic(() => import("@/components/community-screen"), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-500 border-t-transparent" /></div>
-})
-
-const ProfileScreen = dynamic(() => import("@/components/profile-screen"), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-red-500 border-t-transparent" /></div>
-})
+// Preload components on hover/focus for better performance
+const HomeScreen = dynamic(() => import("@/components/home-screen"))
+const RecordScreen = dynamic(() => import("@/components/record-screen"))
+const AnalyticsScreen = dynamic(() => import("@/components/analytics-screen"))
+const CommunityScreen = dynamic(() => import("@/components/community-screen"))
+const ProfileScreen = dynamic(() => import("@/components/profile-screen"))
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
 
@@ -58,6 +34,8 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   const [activeScreen, setActiveScreen] = useState<Screen>(defaultScreen)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [authTimeout, setAuthTimeout] = useState(false)
+  const [loadingScreen, setLoadingScreen] = useState<Screen | null>(null)
+  const [preloadedScreens, setPreloadedScreens] = useState<Set<Screen>>(new Set())
   const { logApp, markFirstRender } = useDebugger()
 
   // Debug logging with more details
@@ -160,20 +138,76 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     { id: "profile" as Screen, label: "プロフィール", icon: User, path: "/profile" },
   ]
 
+  // Preload screen components
+  const preloadScreen = React.useCallback((screenId: Screen) => {
+    if (preloadedScreens.has(screenId)) return
+    
+    setPreloadedScreens(prev => new Set([...prev, screenId]))
+    
+    // Dynamically import the component to trigger preloading
+    switch (screenId) {
+      case 'home':
+        import('@/components/home-screen')
+        break
+      case 'record':
+        import('@/components/record-screen')
+        break
+      case 'analytics':
+        import('@/components/analytics-screen')
+        break
+      case 'community':
+        import('@/components/community-screen')
+        break
+      case 'profile':
+        import('@/components/profile-screen')
+        break
+    }
+  }, [preloadedScreens])
+
+  // Preload adjacent screens on mount
+  React.useEffect(() => {
+    const currentIndex = screens.findIndex(s => s.id === activeScreen)
+    if (currentIndex !== -1) {
+      // Preload previous and next screens
+      const prevScreen = screens[currentIndex - 1]
+      const nextScreen = screens[currentIndex + 1]
+      
+      if (prevScreen) preloadScreen(prevScreen.id)
+      if (nextScreen) preloadScreen(nextScreen.id)
+    }
+  }, [activeScreen, preloadScreen, screens])
+
   const renderActiveScreen = () => {
+    const LoadingComponent = () => (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-red-500 border-t-transparent" />
+      </div>
+    )
+
+    // Show loading if we're switching screens and the component isn't preloaded
+    if (loadingScreen === activeScreen && !preloadedScreens.has(activeScreen)) {
+      return <LoadingComponent />
+    }
+
     switch (activeScreen) {
       case "home":
-        return <HomeScreen />
+        return <React.Suspense fallback={<LoadingComponent />}><HomeScreen /></React.Suspense>
       case "record":
-        return <RecordScreen />
+        return <React.Suspense fallback={<LoadingComponent />}><RecordScreen /></React.Suspense>
       case "analytics":
-        return <AnalyticsScreen />
+        return <React.Suspense fallback={
+          <div className="p-4 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border rounded-lg p-4 skeleton-box h-24"></div>
+            ))}
+          </div>
+        }><AnalyticsScreen /></React.Suspense>
       case "community":
-        return <CommunityScreen />
+        return <React.Suspense fallback={<LoadingComponent />}><CommunityScreen /></React.Suspense>
       case "profile":
-        return <ProfileScreen />
+        return <React.Suspense fallback={<LoadingComponent />}><ProfileScreen /></React.Suspense>
       default:
-        return <HomeScreen />
+        return <React.Suspense fallback={<LoadingComponent />}><HomeScreen /></React.Suspense>
     }
   }
 
@@ -302,7 +336,14 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
               return (
                 <button
                   key={screen.id}
-                  onClick={() => router.push(screen.path)}
+                  onClick={() => {
+                    setLoadingScreen(screen.id)
+                    router.push(screen.path)
+                    // Clear loading state after a short delay
+                    setTimeout(() => setLoadingScreen(null), 100)
+                  }}
+                  onMouseEnter={() => preloadScreen(screen.id)}
+                  onFocus={() => preloadScreen(screen.id)}
                   className={cn(
                     "flex flex-col items-center justify-center flex-1 py-2 px-1 transition-all duration-200",
                     isActive ? "text-red-500" : "text-gray-500 hover:text-gray-700",
