@@ -18,14 +18,18 @@ const dynamicCacheUrls = [
   '/images/'
 ]
 
-// Install event
+// Install event with mobile error handling
 self.addEventListener('install', (event) => {
   event.waitUntil(
     Promise.all([
       caches.open(STATIC_CACHE)
         .then((cache) => {
           console.log('SW: Installing static cache', STATIC_CACHE)
-          return cache.addAll(urlsToCache)
+          return cache.addAll(urlsToCache).catch((error) => {
+            console.warn('SW: Failed to cache some resources:', error)
+            // Don't fail the entire installation if some resources fail
+            return Promise.resolve()
+          })
         }),
       caches.open(DYNAMIC_CACHE)
         .then((cache) => {
@@ -34,6 +38,7 @@ self.addEventListener('install', (event) => {
     ])
     .catch((error) => {
       console.error('SW: Cache installation failed:', error)
+      // Don't prevent installation on mobile devices
     })
   )
   self.skipWaiting()

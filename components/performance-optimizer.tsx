@@ -72,22 +72,31 @@ export default function PerformanceOptimizer() {
           img.decoding = 'async'
         }
         
-        // Add intersection observer for better lazy loading
-        if (!isLogo && 'IntersectionObserver' in window) {
-          const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-              if (entry.isIntersecting) {
-                const img = entry.target as HTMLImageElement
-                if (img.dataset.src) {
-                  img.src = img.dataset.src
-                  img.removeAttribute('data-src')
-                  observer.unobserve(img)
+        // Add intersection observer for better lazy loading - mobile safe
+        if (!isLogo && typeof IntersectionObserver !== 'undefined') {
+          try {
+            const observer = new IntersectionObserver((entries) => {
+              entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                  const img = entry.target as HTMLImageElement
+                  if (img.dataset.src) {
+                    img.src = img.dataset.src
+                    img.removeAttribute('data-src')
+                    observer.unobserve(img)
+                  }
                 }
-              }
-            })
-          }, { threshold: 0.1 })
-          
-          observer.observe(img)
+              })
+            }, { threshold: 0.1 })
+            
+            observer.observe(img)
+          } catch (error) {
+            console.warn('IntersectionObserver failed on mobile:', error)
+            // Fallback: just load the image immediately
+            if (img.dataset.src) {
+              img.src = img.dataset.src
+              img.removeAttribute('data-src')
+            }
+          }
         }
       })
     }

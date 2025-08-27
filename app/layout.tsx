@@ -115,6 +115,31 @@ export default function RootLayout({
       <body className={inter.className}>
         <StructuredData />
         <PerformanceOptimizer />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            // Mobile-specific error handling
+            window.addEventListener('error', function(e) {
+              console.error('Global error caught:', e.error);
+              // Send error to console for debugging
+              if (typeof e.error === 'object') {
+                console.error('Error details:', {
+                  message: e.message,
+                  filename: e.filename,
+                  line: e.lineno,
+                  column: e.colno,
+                  stack: e.error?.stack,
+                  userAgent: navigator.userAgent
+                });
+              }
+            });
+            
+            window.addEventListener('unhandledrejection', function(e) {
+              console.error('Unhandled promise rejection:', e.reason);
+              // Prevent default behavior that shows error page
+              e.preventDefault();
+            });
+          `
+        }} />
         <AuthProvider>
           <WorkoutProvider>
             {children}

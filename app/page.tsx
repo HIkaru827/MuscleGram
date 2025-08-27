@@ -20,6 +20,7 @@ import CommunityScreen from '@/components/community-screen'
 import ProfileScreen from '@/components/profile-screen'
 import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
+import MobileErrorBoundary from "@/components/mobile-error-boundary"
 
 type Screen = "home" | "record" | "analytics" | "community" | "profile"
 
@@ -62,10 +63,17 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     const screenFromPath = getScreenFromPath(pathname)
     setActiveScreen(screenFromPath)
     
-    // パフォーマンス追跡
-    requestIdleCallback(() => {
-      trackRouteChange(pathname, startTime)
-    })
+    // パフォーマンス追跡 - モバイル互換性対応
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => {
+        trackRouteChange(pathname, startTime)
+      })
+    } else {
+      // Fallback for older mobile browsers
+      setTimeout(() => {
+        trackRouteChange(pathname, startTime)
+      }, 0)
+    }
   }, [pathname, trackRouteChange])
 
   // Listen for navigate to record event
@@ -261,8 +269,9 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   }
 
   return (
-    <WorkoutProvider>
-      <div className="min-h-screen bg-white">
+    <MobileErrorBoundary>
+      <WorkoutProvider>
+        <div className="min-h-screen bg-white">
         {/* Header */}
         <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
           <div className="flex items-center justify-center h-16 px-4">
@@ -311,7 +320,8 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
             })}
           </div>
         </nav>
-      </div>
-    </WorkoutProvider>
+        </div>
+      </WorkoutProvider>
+    </MobileErrorBoundary>
   )
 }
