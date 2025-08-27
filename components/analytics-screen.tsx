@@ -67,7 +67,7 @@ export default function AnalyticsScreen() {
   const { user } = useAuth()
   const [selectedExercise, setSelectedExercise] = useState("all")
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("all") 
-  const [timeRange, setTimeRange] = useState("1month")
+  const [timeRange, setTimeRange] = useState("all")
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null)
   const [originalPosts, setOriginalPosts] = useState<WorkoutPost[]>([])
@@ -175,9 +175,23 @@ export default function AnalyticsScreen() {
       : 0
     
     // 頻度を再計算
-    const timeRange = "1month" // デフォルト
-    const daysToSubtract = timeRange === "1month" ? 30 : timeRange === "3months" ? 90 : 180
-    const workoutFrequency = totalWorkouts > 0 ? (totalWorkouts / (daysToSubtract / 7)) : 0
+    let workoutFrequency = 0
+    if (totalWorkouts > 0) {
+      // 全期間の場合は実際の期間で計算
+      if (filteredPosts.length > 0) {
+        const dates = filteredPosts
+          .map(post => post.createdAt?.toDate())
+          .filter((date): date is Date => !!date)
+          .sort((a, b) => a.getTime() - b.getTime())
+        
+        if (dates.length > 1) {
+          const daysDiff = Math.max(1, Math.ceil((dates[dates.length - 1].getTime() - dates[0].getTime()) / (1000 * 60 * 60 * 24)))
+          workoutFrequency = totalWorkouts / (daysDiff / 7)
+        } else {
+          workoutFrequency = totalWorkouts // 1日だけの場合
+        }
+      }
+    }
     
     // 人気種目を再計算
     const exerciseCounts: Record<string, { count: number; bestE1RM: number }> = {}
@@ -315,14 +329,17 @@ export default function AnalyticsScreen() {
         const posts = await getPosts(user.uid, 100) // Get more posts for analysis
 
         // Calculate date range
-        const now = new Date()
-        const daysToSubtract = timeRange === "1month" ? 30 : timeRange === "3months" ? 90 : 180
-        const startDate = subDays(now, daysToSubtract)
-
-        // Filter posts by date range
-        const filteredPosts = posts.filter(post => 
-          post.createdAt && isAfter(post.createdAt.toDate(), startDate)
-        )
+        let filteredPosts = posts
+        if (timeRange !== "all") {
+          const now = new Date()
+          const daysToSubtract = timeRange === "1month" ? 30 : timeRange === "3months" ? 90 : 180
+          const startDate = subDays(now, daysToSubtract)
+          
+          // Filter posts by date range
+          filteredPosts = posts.filter(post => 
+            post.createdAt && isAfter(post.createdAt.toDate(), startDate)
+          )
+        }
 
         // Calculate analytics - count unique workout days
         const workoutDays = new Set<string>()
@@ -350,7 +367,28 @@ export default function AnalyticsScreen() {
           : 0
 
         // Calculate workout frequency (workouts per week)
-        const workoutFrequency = totalWorkouts > 0 ? (totalWorkouts / (daysToSubtract / 7)) : 0
+        let workoutFrequency = 0
+        if (totalWorkouts > 0) {
+          if (timeRange === "all") {
+            // 全期間の場合は実際の期間で計算
+            if (filteredPosts.length > 0) {
+              const dates = filteredPosts
+                .map(post => post.createdAt?.toDate())
+                .filter((date): date is Date => !!date)
+                .sort((a, b) => a.getTime() - b.getTime())
+              
+              if (dates.length > 1) {
+                const daysDiff = Math.max(1, Math.ceil((dates[dates.length - 1].getTime() - dates[0].getTime()) / (1000 * 60 * 60 * 24)))
+                workoutFrequency = totalWorkouts / (daysDiff / 7)
+              } else {
+                workoutFrequency = totalWorkouts // 1日だけの場合
+              }
+            }
+          } else {
+            const daysToSubtract = timeRange === "1month" ? 30 : timeRange === "3months" ? 90 : 180
+            workoutFrequency = totalWorkouts / (daysToSubtract / 7)
+          }
+        }
 
         // Find favorite exercises with best e1RM
         const exerciseCounts: Record<string, { count: number; bestE1RM: number }> = {}
@@ -545,10 +583,11 @@ export default function AnalyticsScreen() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">分析</h2>
         <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32 bg-white">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white">
+            <SelectItem value="all">全期間</SelectItem>
             <SelectItem value="1month">1ヶ月</SelectItem>
             <SelectItem value="3months">3ヶ月</SelectItem>
             <SelectItem value="6months">6ヶ月</SelectItem>
@@ -641,10 +680,10 @@ export default function AnalyticsScreen() {
                   setSelectedMuscleGroup(value)
                   if (value !== "all") setSelectedExercise("all") // 部位選択時は種目をリセット
                 }}>
-                  <SelectTrigger className="w-24 sm:w-28 h-8 text-xs">
+                  <SelectTrigger className="w-24 sm:w-28 h-8 text-xs bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white">
                     <SelectItem value="all">全部位</SelectItem>
                     {MUSCLE_GROUPS.map(group => (
                       <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
@@ -657,10 +696,10 @@ export default function AnalyticsScreen() {
               <div className="flex flex-col">
                 <label className="text-xs text-gray-500 mb-1">種目</label>
                 <Select value={selectedExercise} onValueChange={setSelectedExercise}>
-                  <SelectTrigger className="w-32 sm:w-40 h-8 text-xs">
+                  <SelectTrigger className="w-32 sm:w-40 h-8 text-xs bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white">
                     <SelectItem value="all">全種目</SelectItem>
                     {(selectedMuscleGroup !== "all" 
                       ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises.filter(ex => 
