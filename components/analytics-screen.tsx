@@ -29,11 +29,47 @@ interface AnalyticsData {
   exerciseProgress: { exercise: string; progress: { date: string; maxWeight: number }[] }[]
 }
 
+// 部位・種目フィルター定義
+const MUSCLE_GROUPS = [
+  {
+    id: "chest",
+    name: "胸",
+    exercises: ["ベンチプレス", "インクラインプレス", "ダンベルフライ", "ペックフライ", "プッシュアップ", "ディップス"]
+  },
+  {
+    id: "back", 
+    name: "背中",
+    exercises: ["ラットプルダウン", "チンニング", "ベントオーバーロウ", "ケーブルロー", "デッドリフト", "シュラッグ", "ローイング"]
+  },
+  {
+    id: "legs",
+    name: "脚",
+    exercises: ["スクワット", "レッグプレス", "レッグエクステンション", "レッグカール", "カーフレイズ", "ランジ", "ブルガリアンスクワット"]
+  },
+  {
+    id: "shoulders",
+    name: "肩",
+    exercises: ["ショルダープレス", "サイドレイズ", "フロントレイズ", "リアデルト", "アップライトロウ", "ダンベルプレス"]
+  },
+  {
+    id: "arms",
+    name: "腕",
+    exercises: ["バーベルカール", "ダンベルカール", "ハンマーカール", "トライセプスエクステンション", "フレンチプレス", "ディップス"]
+  },
+  {
+    id: "abs",
+    name: "腹",
+    exercises: ["プランク", "クランチ", "シットアップ", "レッグレイズ", "ロシアンツイスト", "マウンテンクライマー"]
+  }
+]
+
 export default function AnalyticsScreen() {
   const { user } = useAuth()
   const [selectedExercise, setSelectedExercise] = useState("all")
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("all") 
   const [timeRange, setTimeRange] = useState("1month")
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [weeklyPRs, setWeeklyPRs] = useState<PRRecord[]>([])
   const [allPRs, setAllPRs] = useState<PRRecord[]>([])
@@ -43,6 +79,7 @@ export default function AnalyticsScreen() {
     prType: PRRecord['prType']
     trendData: PRRecord[]
   } | null>(null)
+  const [availableExercises, setAvailableExercises] = useState<string[]>([])
 
   const openTrendModal = async (exerciseName: string, prType: PRRecord['prType']) => {
     if (!user) return
@@ -78,6 +115,33 @@ export default function AnalyticsScreen() {
     }
   }
 
+  // データをフィルタリングする関数
+  const applyFilters = useCallback((data: AnalyticsData) => {
+    if (!data) return data
+    
+    // 部位フィルター
+    const muscleGroupExercises = selectedMuscleGroup !== "all" 
+      ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises || []
+      : []
+    
+    // 種目フィルター
+    const shouldIncludeExercise = (exerciseName: string) => {
+      if (selectedExercise !== "all" && selectedExercise !== exerciseName) return false
+      if (selectedMuscleGroup !== "all" && !muscleGroupExercises.includes(exerciseName)) return false
+      return true
+    }
+    
+    // フィルタ適用後のデータを作成
+    const filteredFavoriteExercises = data.favoriteExercises.filter(ex => shouldIncludeExercise(ex.name))
+    const filteredExerciseProgress = data.exerciseProgress.filter(ex => shouldIncludeExercise(ex.exercise))
+    
+    return {
+      ...data,
+      favoriteExercises: filteredFavoriteExercises,
+      exerciseProgress: filteredExerciseProgress
+    }
+  }, [selectedMuscleGroup, selectedExercise])
+
   const loadAnalyticsData = useCallback(async () => {
       if (!user) {
         setLoading(false)
@@ -107,7 +171,12 @@ export default function AnalyticsScreen() {
           exerciseProgress: []
         }
         
-        setAnalyticsData(demoData)
+        // 元データと利用可能な種目を保存
+        setOriginalAnalyticsData(demoData)
+        setAvailableExercises(demoData.favoriteExercises.map(ex => ex.name))
+        
+        // フィルターを適用してセット
+        setAnalyticsData(applyFilters(demoData))
         setWeeklyPRs([])
         setAllPRs([])
         setLoading(false)
@@ -239,7 +308,7 @@ export default function AnalyticsScreen() {
           exerciseProgress.push({ exercise: name, progress: exerciseData })
         })
 
-        setAnalyticsData({
+        const fullData = {
           totalWorkouts,
           totalVolume,
           averageWorkoutDuration,
@@ -247,7 +316,14 @@ export default function AnalyticsScreen() {
           favoriteExercises,
           progressData: progressData.sort((a, b) => a.date.localeCompare(b.date)),
           exerciseProgress
-        })
+        }
+        
+        // 元データと利用可能な種目を保存
+        setOriginalAnalyticsData(fullData)
+        setAvailableExercises(favoriteExercises.map(ex => ex.name))
+        
+        // フィルターを適用してセット
+        setAnalyticsData(applyFilters(fullData))
 
         // Load PR data
         const [weeklyPRsData, allPRsData] = await Promise.all([
@@ -268,6 +344,13 @@ export default function AnalyticsScreen() {
   useEffect(() => {
     loadAnalyticsData()
   }, [loadAnalyticsData])
+
+  // フィルターが変更された時にデータを再フィルタリング
+  useEffect(() => {
+    if (originalAnalyticsData) {
+      setAnalyticsData(applyFilters(originalAnalyticsData))
+    }
+  }, [originalAnalyticsData, applyFilters])
 
   // Reload analytics data when component becomes visible or when posts are deleted
   useEffect(() => {
@@ -325,18 +408,108 @@ export default function AnalyticsScreen() {
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">分析</h2>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1month">1ヶ月</SelectItem>
-            <SelectItem value="3months">3ヶ月</SelectItem>
-            <SelectItem value="6months">6ヶ月</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">分析</h2>
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1month">1ヶ月</SelectItem>
+              <SelectItem value="3months">3ヶ月</SelectItem>
+              <SelectItem value="6months">6ヶ月</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* フィルター */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-gray-700">フィルター:</span>
+              </div>
+              
+              <div className="flex flex-wrap gap-3">
+                {/* 部位フィルター */}
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 mb-1">部位</label>
+                  <Select value={selectedMuscleGroup} onValueChange={(value) => {
+                    setSelectedMuscleGroup(value)
+                    if (value !== "all") setSelectedExercise("all") // 部位選択時は種目をリセット
+                  }}>
+                    <SelectTrigger className="w-24 sm:w-28 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部位</SelectItem>
+                      {MUSCLE_GROUPS.map(group => (
+                        <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 種目フィルター */}
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 mb-1">種目</label>
+                  <Select value={selectedExercise} onValueChange={setSelectedExercise}>
+                    <SelectTrigger className="w-32 sm:w-40 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全種目</SelectItem>
+                      {(selectedMuscleGroup !== "all" 
+                        ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises.filter(ex => 
+                            availableExercises.includes(ex)
+                          ) || []
+                        : availableExercises
+                      ).map(exercise => (
+                        <SelectItem key={exercise} value={exercise}>{exercise}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* フィルター状態表示 */}
+                {(selectedMuscleGroup !== "all" || selectedExercise !== "all") && (
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedMuscleGroup("all")
+                        setSelectedExercise("all")
+                      }}
+                      className="h-8 px-3 text-xs"
+                    >
+                      フィルターをクリア
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* アクティブフィルター表示 */}
+            {(selectedMuscleGroup !== "all" || selectedExercise !== "all") && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex flex-wrap gap-2">
+                  {selectedMuscleGroup !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      部位: {MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.name}
+                    </Badge>
+                  )}
+                  {selectedExercise !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      種目: {selectedExercise}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Key Metrics */}
