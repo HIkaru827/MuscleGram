@@ -229,11 +229,12 @@ export default function LoginScreen({ onClose }: LoginScreenProps) {
 
             <Button
               type="submit"
-              className="w-full bg-red-500 hover:bg-red-600"
+              variant="outline"
+              className="w-full text-red-600 border-red-200 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
               disabled={loading}
             >
               {loading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
               ) : (
                 <>
                   {isSignUp ? <UserPlus className="mr-2 h-4 w-4" /> : <LogIn className="mr-2 h-4 w-4" />}

@@ -55,7 +55,7 @@ class MobileErrorBoundary extends React.Component<MobileErrorBoundaryProps, Mobi
             <div className="space-y-3">
               <button 
                 onClick={() => window.location.reload()}
-                className="w-full bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-colors"
+                className="w-full text-red-600 border border-red-200 bg-white px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors"
               >
                 ページを更新
               </button>
@@ -63,7 +63,7 @@ class MobileErrorBoundary extends React.Component<MobileErrorBoundaryProps, Mobi
                 onClick={() => {
                   this.setState({ hasError: false, error: null })
                 }}
-                className="w-full bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                className="w-full text-red-600 border border-red-200 bg-white px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors"
               >
                 再試行
               </button>

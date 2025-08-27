@@ -269,11 +269,11 @@ export default function HomeScreen() {
             <AlertDialogAction
               onClick={handleDeletePost}
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="text-red-600 border-red-200 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
             >
               {deleting ? (
                 <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
                   <span>削除中...</span>
                 </div>
               ) : (

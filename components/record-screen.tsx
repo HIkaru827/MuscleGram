@@ -635,7 +635,8 @@ export default function RecordScreen() {
             <Button 
               onClick={finishWorkout} 
               disabled={recordMode === 'manual' && !isValidManualTime()}
-              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-300 shrink-0"
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 shrink-0"
             >
               完了
             </Button>
@@ -964,10 +965,11 @@ export default function RecordScreen() {
                 <Button
                   onClick={handlePostWorkout}
                   disabled={posting}
-                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  variant="outline"
+                  className="flex-1 text-red-600 border-red-200 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
                 >
                   {posting ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
                   ) : (
                     <>
                       <Send className="w-4 h-4 mr-2" />
@@ -1008,7 +1010,11 @@ export default function RecordScreen() {
               )}
             </div>
           </div>
-          <Button onClick={startWorkout} className="bg-red-600 hover:bg-red-700 shrink-0">
+          <Button 
+            onClick={startWorkout} 
+            variant="outline"
+            className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
+          >
             <Play className="mr-2 h-4 w-4" />
             開始
           </Button>
@@ -1187,7 +1193,8 @@ export default function RecordScreen() {
             <div className="flex justify-center pt-4">
               <Button 
                 onClick={() => setShowPRCelebration(false)}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50"
               >
                 続ける
               </Button>
