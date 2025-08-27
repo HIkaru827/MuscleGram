@@ -655,6 +655,7 @@ export default function RecordScreen() {
                   onClick={() => setShowTimerDialog(true)} 
                   variant="outline"
                   size="sm"
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
                 >
                   <Clock className="w-4 h-4 mr-1" />
                   タイマー
@@ -698,6 +699,7 @@ export default function RecordScreen() {
                     onClick={() => setShowTimerDialog(true)} 
                     variant="outline"
                     size="sm"
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
                   >
                     <Clock className="w-4 h-4 mr-1" />
                     タイマー

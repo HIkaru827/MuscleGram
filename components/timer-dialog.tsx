@@ -53,6 +53,8 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
         if (prev <= 1) {
           setIsRunning(false)
           clearInterval(id)
+          // Timer completed - notify user
+          onTimerComplete()
           return 0
         }
         return prev - 1
@@ -60,6 +62,35 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
     }, 1000)
     
     setTimerId(id)
+  }
+
+  const onTimerComplete = () => {
+    // Vibrate if supported
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200])
+    }
+    
+    // Show notification if permission granted
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification('MuscleGram タイマー', {
+        body: '休憩時間が終了しました！次のセットを始めましょう！',
+        icon: '/icon-192x192.png',
+        tag: 'timer-complete'
+      })
+    }
+    
+    // Play sound (optional - could add audio element)
+    try {
+      const audio = new Audio()
+      audio.volume = 0.3
+      // Simple beep using data URL
+      audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCkOByuXOSSoFJIzR8dxgHwMQ9+S8cCb3nJm2'
+      audio.play().catch(() => {
+        // Silent fail if audio can't play
+      })
+    } catch (error) {
+      // Silent fail if audio is not supported
+    }
   }
 
   const pauseTimer = () => {
@@ -87,6 +118,8 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
         if (prev <= 1) {
           setIsRunning(false)
           clearInterval(id)
+          // Timer completed - notify user
+          onTimerComplete()
           return 0
         }
         return prev - 1
@@ -98,14 +131,14 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-80">
+      <DialogContent className="max-w-sm mx-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
             休憩タイマー
           </DialogTitle>
           <DialogDescription>
-            セット間の休憩時間を管理するためのタイマーです。
+            セット間の休憩時間を管理します。タイマーはダイアログを閉じても動き続けます。
           </DialogDescription>
         </DialogHeader>
         
@@ -137,33 +170,64 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
                 </div>
               </div>
               
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { setMinutes(1); setSeconds(0) }}
-                >
-                  1分
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { setMinutes(3); setSeconds(0) }}
-                >
-                  3分
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { setMinutes(5); setSeconds(0) }}
-                >
-                  5分
-                </Button>
+              <div className="space-y-2">
+                <div className="text-sm text-gray-600 font-medium">クイック設定</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMinutes(1); setSeconds(0) }}
+                    className="text-xs"
+                  >
+                    1分
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMinutes(2); setSeconds(0) }}
+                    className="text-xs"
+                  >
+                    2分
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMinutes(3); setSeconds(0) }}
+                    className="text-xs"
+                  >
+                    3分
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMinutes(0); setSeconds(30) }}
+                    className="text-xs"
+                  >
+                    30秒
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMinutes(1); setSeconds(30) }}
+                    className="text-xs"
+                  >
+                    1分半
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMinutes(5); setSeconds(0) }}
+                    className="text-xs"
+                  >
+                    5分
+                  </Button>
+                </div>
               </div>
               
               <Button
                 onClick={startTimer}
-                className="w-full"
+                variant="outline"
+                className="w-full text-red-600 border-red-200 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
                 disabled={minutes === 0 && seconds === 0}
               >
                 <Play className="w-4 h-4 mr-2" />
@@ -173,12 +237,23 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
           ) : (
             <div className="space-y-4">
               <div className="text-center">
-                <div className="text-4xl font-mono font-bold text-red-600">
-                  {formatTime(remainingSeconds)}
+                <div className={`text-4xl font-mono font-bold transition-all duration-500 ${
+                  remainingSeconds === 0 
+                    ? 'text-green-600 animate-pulse' 
+                    : remainingSeconds <= 10 
+                      ? 'text-orange-600' 
+                      : 'text-red-600'
+                }`}>
+                  {remainingSeconds === 0 ? '完了！' : formatTime(remainingSeconds)}
                 </div>
                 <div className="text-sm text-gray-500">
                   {formatTime(totalSeconds - remainingSeconds)} / {formatTime(totalSeconds)}
                 </div>
+                {remainingSeconds === 0 && (
+                  <div className="text-sm text-green-600 font-medium animate-bounce">
+                    次のセットを開始しましょう！
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-2">
@@ -188,7 +263,11 @@ export default function TimerDialog({ isOpen, onOpenChange }: TimerDialogProps) 
                     一時停止
                   </Button>
                 ) : (
-                  <Button onClick={resumeTimer} className="flex-1">
+                  <Button 
+                    onClick={resumeTimer} 
+                    variant="outline"
+                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                  >
                     <Play className="w-4 h-4 mr-2" />
                     再開
                   </Button>
