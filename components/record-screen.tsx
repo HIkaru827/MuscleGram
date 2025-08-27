@@ -726,42 +726,49 @@ export default function RecordScreen() {
                   {entry.sets.map((set, setIndex) => {
                     const e1rm = calculateE1RM(set.weight, set.reps)
                     return (
-                      <div key={setIndex} className="flex items-center space-x-2">
-                        <span className="w-8 text-sm text-gray-500">#{setIndex + 1}</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            placeholder="重量"
-                            value={set.weight || ''}
-                            onChange={(e) => updateSet(entry.exerciseId, setIndex, 'weight', Number(e.target.value))}
-                            className="w-20"
-                          />
-                          <span className="text-sm text-gray-500">kg</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            placeholder="回数"
-                            value={set.reps || ''}
-                            onChange={(e) => updateSet(entry.exerciseId, setIndex, 'reps', Number(e.target.value))}
-                            className="w-20"
-                          />
-                          <span className="text-sm text-gray-500">回</span>
-                        </div>
-                        {e1rm > 0 && (
-                          <div className="flex items-center space-x-1 text-xs text-purple-600">
-                            <span>e1RM:</span>
-                            <span className="font-medium">{e1rm.toFixed(1)}kg</span>
+                      <div key={setIndex} className="flex flex-col sm:flex-row gap-2 p-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <span className="w-8 text-sm text-gray-500 shrink-0">#{setIndex + 1}</span>
+                          <div className="flex items-center space-x-1">
+                            <Input
+                              type="number"
+                              placeholder="重量"
+                              value={set.weight || ''}
+                              onChange={(e) => updateSet(entry.exerciseId, setIndex, 'weight', Number(e.target.value))}
+                              className="w-16 text-sm"
+                              size="sm"
+                            />
+                            <span className="text-xs text-gray-500">kg</span>
                           </div>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeSet(entry.exerciseId, setIndex)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          <div className="flex items-center space-x-1">
+                            <Input
+                              type="number"
+                              placeholder="回数"
+                              value={set.reps || ''}
+                              onChange={(e) => updateSet(entry.exerciseId, setIndex, 'reps', Number(e.target.value))}
+                              className="w-16 text-sm"
+                              size="sm"
+                            />
+                            <span className="text-xs text-gray-500">回</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0">
+                          {e1rm > 0 && (
+                            <div className="flex items-center space-x-1 text-xs text-purple-600">
+                              <span>e1RM:</span>
+                              <span className="font-medium">{e1rm.toFixed(1)}kg</span>
+                            </div>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeSet(entry.exerciseId, setIndex)}
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     )
                   })}
