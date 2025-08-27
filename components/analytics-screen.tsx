@@ -70,6 +70,9 @@ export default function AnalyticsScreen() {
   const [timeRange, setTimeRange] = useState("1month")
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [originalPosts, setOriginalPosts] = useState<WorkoutPost[]>([])
+  const [filteredWeeklyPRs, setFilteredWeeklyPRs] = useState<PRRecord[]>([])
+  const [filteredAllPRs, setFilteredAllPRs] = useState<PRRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [weeklyPRs, setWeeklyPRs] = useState<PRRecord[]>([])
   const [allPRs, setAllPRs] = useState<PRRecord[]>([])
@@ -116,8 +119,8 @@ export default function AnalyticsScreen() {
   }
 
   // データをフィルタリングする関数
-  const applyFilters = useCallback((data: AnalyticsData) => {
-    if (!data) return data
+  const applyFilters = useCallback((data: AnalyticsData, posts: WorkoutPost[]) => {
+    if (!data) return { filteredData: data, filteredPosts: posts }
     
     // 部位フィルター
     const muscleGroupExercises = selectedMuscleGroup !== "all" 
@@ -131,15 +134,135 @@ export default function AnalyticsScreen() {
       return true
     }
     
-    // フィルタ適用後のデータを作成
-    const filteredFavoriteExercises = data.favoriteExercises.filter(ex => shouldIncludeExercise(ex.name))
-    const filteredExerciseProgress = data.exerciseProgress.filter(ex => shouldIncludeExercise(ex.exercise))
+    // 投稿をフィルタリング
+    const filteredPosts = posts.filter(post => 
+      post.exercises.some(exercise => shouldIncludeExercise(exercise.name))
+    )
     
-    return {
-      ...data,
-      favoriteExercises: filteredFavoriteExercises,
-      exerciseProgress: filteredExerciseProgress
+    // フィルタリングされた投稿から新しい分析データを計算
+    if (selectedMuscleGroup === "all" && selectedExercise === "all") {
+      return { 
+        filteredData: data, 
+        filteredPosts: posts 
+      }
     }
+    
+    // ワークアウト日数を再計算
+    const workoutDays = new Set<string>()
+    filteredPosts.forEach(post => {
+      if (post.createdAt) {
+        workoutDays.add(format(post.createdAt.toDate(), 'yyyy-MM-dd'))
+      }
+    })
+    const totalWorkouts = workoutDays.size
+    
+    // 総ボリュームを再計算（フィルターされた種目のみ）
+    const totalVolume = filteredPosts.reduce((sum, post) => {
+      const postVolume = post.exercises
+        .filter(exercise => shouldIncludeExercise(exercise.name))
+        .reduce((exerciseSum, exercise) => {
+          const exerciseVolume = exercise.sets.reduce((setSum, set) => {
+            return setSum + (set.weight * set.reps)
+          }, 0)
+          return exerciseSum + exerciseVolume
+        }, 0)
+      return sum + postVolume
+    }, 0)
+    
+    // 平均時間を再計算
+    const averageWorkoutDuration = totalWorkouts > 0 
+      ? Math.round(filteredPosts.reduce((sum, post) => sum + post.duration, 0) / totalWorkouts)
+      : 0
+    
+    // 頻度を再計算
+    const timeRange = "1month" // デフォルト
+    const daysToSubtract = timeRange === "1month" ? 30 : timeRange === "3months" ? 90 : 180
+    const workoutFrequency = totalWorkouts > 0 ? (totalWorkouts / (daysToSubtract / 7)) : 0
+    
+    // 人気種目を再計算
+    const exerciseCounts: Record<string, { count: number; bestE1RM: number }> = {}
+    filteredPosts.forEach(post => {
+      post.exercises.filter(exercise => shouldIncludeExercise(exercise.name)).forEach(exercise => {
+        if (!exerciseCounts[exercise.name]) {
+          exerciseCounts[exercise.name] = { count: 0, bestE1RM: 0 }
+        }
+        exerciseCounts[exercise.name].count += 1
+        
+        // Calculate best e1RM for this exercise
+        const bestSet = findBestE1RMSet(exercise.sets)
+        if (bestSet && bestSet.e1rm > exerciseCounts[exercise.name].bestE1RM) {
+          exerciseCounts[exercise.name].bestE1RM = bestSet.e1rm
+        }
+      })
+    })
+    
+    const favoriteExercises = Object.entries(exerciseCounts)
+      .map(([name, data]) => ({ name, count: data.count, bestE1RM: data.bestE1RM }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+    
+    // 進捗データを再計算
+    const progressData: { date: string; volume: number; workouts: number }[] = []
+    const groupedData: Record<string, { volume: number; workoutDays: Set<string> }> = {}
+
+    filteredPosts.forEach(post => {
+      if (!post.createdAt) return
+      
+      const postDate = post.createdAt.toDate()
+      const groupKey = format(startOfWeek(postDate), 'MM/dd', { locale: ja })
+      const dayKey = format(postDate, 'yyyy-MM-dd')
+
+      if (!groupedData[groupKey]) {
+        groupedData[groupKey] = { volume: 0, workoutDays: new Set<string>() }
+      }
+
+      const postVolume = post.exercises
+        .filter(exercise => shouldIncludeExercise(exercise.name))
+        .reduce((sum, exercise) => {
+          return sum + exercise.sets.reduce((setSum, set) => setSum + (set.weight * set.reps), 0)
+        }, 0)
+
+      groupedData[groupKey].volume += postVolume
+      groupedData[groupKey].workoutDays.add(dayKey)
+    })
+
+    Object.entries(groupedData).forEach(([date, data]) => {
+      progressData.push({ 
+        date, 
+        volume: data.volume, 
+        workouts: data.workoutDays.size 
+      })
+    })
+    
+    const filteredData = {
+      ...data,
+      totalWorkouts,
+      totalVolume,
+      averageWorkoutDuration,
+      workoutFrequency,
+      favoriteExercises,
+      progressData: progressData.sort((a, b) => a.date.localeCompare(b.date)),
+      exerciseProgress: data.exerciseProgress.filter(ex => shouldIncludeExercise(ex.exercise))
+    }
+    
+    return { filteredData, filteredPosts }
+  }, [selectedMuscleGroup, selectedExercise])
+
+  // PRデータをフィルタリングする関数
+  const filterPRs = useCallback((prs: PRRecord[]) => {
+    if (selectedMuscleGroup === "all" && selectedExercise === "all") {
+      return prs
+    }
+    
+    const muscleGroupExercises = selectedMuscleGroup !== "all" 
+      ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises || []
+      : []
+    
+    return prs.filter(pr => {
+      if (selectedExercise !== "all" && selectedExercise !== pr.exerciseName) return false
+      if (selectedMuscleGroup !== "all" && !muscleGroupExercises.includes(pr.exerciseName)) return false
+      return true
+    })
   }, [selectedMuscleGroup, selectedExercise])
 
   const loadAnalyticsData = useCallback(async () => {
@@ -173,12 +296,16 @@ export default function AnalyticsScreen() {
         
         // 元データと利用可能な種目を保存
         setOriginalAnalyticsData(demoData)
+        setOriginalPosts([])
         setAvailableExercises(demoData.favoriteExercises.map(ex => ex.name))
         
         // フィルターを適用してセット
-        setAnalyticsData(applyFilters(demoData))
+        const { filteredData } = applyFilters(demoData, [])
+        setAnalyticsData(filteredData)
         setWeeklyPRs([])
         setAllPRs([])
+        setFilteredWeeklyPRs([])
+        setFilteredAllPRs([])
         setLoading(false)
         return
       }
@@ -320,11 +447,9 @@ export default function AnalyticsScreen() {
         
         // 元データと利用可能な種目を保存
         setOriginalAnalyticsData(fullData)
+        setOriginalPosts(filteredPosts)
         setAvailableExercises(favoriteExercises.map(ex => ex.name))
         
-        // フィルターを適用してセット
-        setAnalyticsData(applyFilters(fullData))
-
         // Load PR data
         const [weeklyPRsData, allPRsData] = await Promise.all([
           getWeeklyPRs(user.uid),
@@ -333,6 +458,12 @@ export default function AnalyticsScreen() {
         
         setWeeklyPRs(weeklyPRsData)
         setAllPRs(allPRsData)
+        
+        // フィルターを適用してセット
+        const { filteredData } = applyFilters(fullData, filteredPosts)
+        setAnalyticsData(filteredData)
+        setFilteredWeeklyPRs(filterPRs(weeklyPRsData))
+        setFilteredAllPRs(filterPRs(allPRsData))
 
       } catch (error) {
         console.error('Error loading analytics data:', error)
@@ -347,10 +478,13 @@ export default function AnalyticsScreen() {
 
   // フィルターが変更された時にデータを再フィルタリング
   useEffect(() => {
-    if (originalAnalyticsData) {
-      setAnalyticsData(applyFilters(originalAnalyticsData))
+    if (originalAnalyticsData && originalPosts) {
+      const { filteredData } = applyFilters(originalAnalyticsData, originalPosts)
+      setAnalyticsData(filteredData)
+      setFilteredWeeklyPRs(filterPRs(weeklyPRs))
+      setFilteredAllPRs(filterPRs(allPRs))
     }
-  }, [originalAnalyticsData, applyFilters])
+  }, [originalAnalyticsData, originalPosts, applyFilters, filterPRs, weeklyPRs, allPRs])
 
   // Reload analytics data when component becomes visible or when posts are deleted
   useEffect(() => {
@@ -408,108 +542,18 @@ export default function AnalyticsScreen() {
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
       {/* Header */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">分析</h2>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1month">1ヶ月</SelectItem>
-              <SelectItem value="3months">3ヶ月</SelectItem>
-              <SelectItem value="6months">6ヶ月</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* フィルター */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">フィルター:</span>
-              </div>
-              
-              <div className="flex flex-wrap gap-3">
-                {/* 部位フィルター */}
-                <div className="flex flex-col">
-                  <label className="text-xs text-gray-500 mb-1">部位</label>
-                  <Select value={selectedMuscleGroup} onValueChange={(value) => {
-                    setSelectedMuscleGroup(value)
-                    if (value !== "all") setSelectedExercise("all") // 部位選択時は種目をリセット
-                  }}>
-                    <SelectTrigger className="w-24 sm:w-28 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全部位</SelectItem>
-                      {MUSCLE_GROUPS.map(group => (
-                        <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 種目フィルター */}
-                <div className="flex flex-col">
-                  <label className="text-xs text-gray-500 mb-1">種目</label>
-                  <Select value={selectedExercise} onValueChange={setSelectedExercise}>
-                    <SelectTrigger className="w-32 sm:w-40 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全種目</SelectItem>
-                      {(selectedMuscleGroup !== "all" 
-                        ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises.filter(ex => 
-                            availableExercises.includes(ex)
-                          ) || []
-                        : availableExercises
-                      ).map(exercise => (
-                        <SelectItem key={exercise} value={exercise}>{exercise}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* フィルター状態表示 */}
-                {(selectedMuscleGroup !== "all" || selectedExercise !== "all") && (
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setSelectedMuscleGroup("all")
-                        setSelectedExercise("all")
-                      }}
-                      className="h-8 px-3 text-xs"
-                    >
-                      フィルターをクリア
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* アクティブフィルター表示 */}
-            {(selectedMuscleGroup !== "all" || selectedExercise !== "all") && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <div className="flex flex-wrap gap-2">
-                  {selectedMuscleGroup !== "all" && (
-                    <Badge variant="secondary" className="text-xs">
-                      部位: {MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.name}
-                    </Badge>
-                  )}
-                  {selectedExercise !== "all" && (
-                    <Badge variant="secondary" className="text-xs">
-                      種目: {selectedExercise}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">分析</h2>
+        <Select value={timeRange} onValueChange={setTimeRange}>
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1month">1ヶ月</SelectItem>
+            <SelectItem value="3months">3ヶ月</SelectItem>
+            <SelectItem value="6months">6ヶ月</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Key Metrics */}
@@ -580,6 +624,94 @@ export default function AnalyticsScreen() {
           console.log('Selected exercise for training:', exerciseName)
         }}
       />
+
+      {/* フィルター */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-gray-700">フィルター:</span>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              {/* 部位フィルター */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 mb-1">部位</label>
+                <Select value={selectedMuscleGroup} onValueChange={(value) => {
+                  setSelectedMuscleGroup(value)
+                  if (value !== "all") setSelectedExercise("all") // 部位選択時は種目をリセット
+                }}>
+                  <SelectTrigger className="w-24 sm:w-28 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部位</SelectItem>
+                    {MUSCLE_GROUPS.map(group => (
+                      <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 種目フィルター */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 mb-1">種目</label>
+                <Select value={selectedExercise} onValueChange={setSelectedExercise}>
+                  <SelectTrigger className="w-32 sm:w-40 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全種目</SelectItem>
+                    {(selectedMuscleGroup !== "all" 
+                      ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises.filter(ex => 
+                          availableExercises.includes(ex)
+                        ) || []
+                      : availableExercises
+                    ).map(exercise => (
+                      <SelectItem key={exercise} value={exercise}>{exercise}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* フィルター状態表示 */}
+              {(selectedMuscleGroup !== "all" || selectedExercise !== "all") && (
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setSelectedMuscleGroup("all")
+                      setSelectedExercise("all")
+                    }}
+                    className="h-8 px-3 text-xs"
+                  >
+                    フィルターをクリア
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* アクティブフィルター表示 */}
+          {(selectedMuscleGroup !== "all" || selectedExercise !== "all") && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="flex flex-wrap gap-2">
+                {selectedMuscleGroup !== "all" && (
+                  <Badge variant="secondary" className="text-xs">
+                    部位: {MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.name}
+                  </Badge>
+                )}
+                {selectedExercise !== "all" && (
+                  <Badge variant="secondary" className="text-xs">
+                    種目: {selectedExercise}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <Tabs defaultValue="progress" className="space-y-4">
@@ -685,16 +817,16 @@ export default function AnalyticsScreen() {
         <TabsContent value="prs" className="space-y-4">
           {/* 今週のPR - 改善版 */}
           <EnhancedWeeklyPRs 
-            weeklyPRs={weeklyPRs} 
+            weeklyPRs={filteredWeeklyPRs} 
             onTrendClick={openTrendModal} 
           />
           
           {/* 過去のPR履歴 */}
-          {allPRs.length > weeklyPRs.length && (
+          {filteredAllPRs.length > filteredWeeklyPRs.length && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mt-8">過去のPR履歴</h3>
               <div className="grid grid-cols-1 gap-4">
-                {groupPRsByWeek(allPRs.filter(pr => !weeklyPRs.find(wpr => wpr.id === pr.id)))
+                {groupPRsByWeek(filteredAllPRs.filter(pr => !filteredWeeklyPRs.find(wpr => wpr.id === pr.id)))
                   .slice(0, 4).map((weekPRs, weekIndex) => (
                   <Card key={weekIndex}>
                     <CardHeader>
