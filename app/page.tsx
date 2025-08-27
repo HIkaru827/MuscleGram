@@ -22,6 +22,13 @@ import LoginScreen from "@/components/auth/login-screen"
 import WorkoutIndicator from "@/components/workout-indicator"
 import MobileErrorBoundary from "@/components/mobile-error-boundary"
 
+// Memoized components to prevent unnecessary re-renders
+const MemoizedHomeScreen = React.memo(HomeScreen)
+const MemoizedRecordScreen = React.memo(RecordScreen)
+const MemoizedAnalyticsScreen = React.memo(AnalyticsScreen)
+const MemoizedCommunityScreen = React.memo(CommunityScreen)
+const MemoizedProfileScreen = React.memo(ProfileScreen)
+
 type Screen = "home" | "record" | "analytics" | "community" | "profile"
 
 interface FitnessAppProps {
@@ -108,13 +115,10 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   // Handle initial load completion with timeout fallback
   React.useEffect(() => {
     if (!loading) {
-      // Minimal delay for much faster loading
-      const timer = setTimeout(() => {
-        setIsInitialLoad(false)
-        markFirstRender()
-        logApp('Initial load completed, isInitialLoad set to false')
-      }, 100) // 100ms instead of 500ms - much faster
-      return () => clearTimeout(timer)
+      // Immediate completion for faster loading
+      setIsInitialLoad(false)
+      markFirstRender()
+      logApp('Initial load completed, isInitialLoad set to false')
     }
   }, [loading])
 
@@ -126,7 +130,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
         setAuthTimeout(true)
         setIsInitialLoad(false)
       }
-    }, 3000) // 3 second timeout - much faster
+    }, 1000) // 1 second timeout - much faster
 
     return () => clearTimeout(authTimeoutTimer)
   }, [loading, isInitialLoad])
@@ -135,10 +139,10 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   React.useEffect(() => {
     const forceLoadTimer = setTimeout(() => {
       if (isInitialLoad) {
-        logApp('Force completing initial load after 5 seconds')
+        logApp('Force completing initial load after 2 seconds')
         setIsInitialLoad(false)
       }
-    }, 5000) // 5 second force timeout - much faster
+    }, 2000) // 2 second force timeout - much faster
 
     return () => clearTimeout(forceLoadTimer)
   }, [])
@@ -153,23 +157,23 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
 
   // No more preloading needed - all components are statically imported
 
-  const renderActiveScreen = () => {
-    // Instant component switching with static imports
+  const renderActiveScreen = React.useMemo(() => {
+    // Instant component switching with memoized components
     switch (activeScreen) {
       case "home":
-        return <HomeScreen />
+        return <MemoizedHomeScreen />
       case "record":
-        return <RecordScreen />
+        return <MemoizedRecordScreen />
       case "analytics":
-        return <AnalyticsScreen />
+        return <MemoizedAnalyticsScreen />
       case "community":
-        return <CommunityScreen />
+        return <MemoizedCommunityScreen />
       case "profile":
-        return <ProfileScreen />
+        return <MemoizedProfileScreen />
       default:
-        return <HomeScreen />
+        return <MemoizedHomeScreen />
     }
-  }
+  }, [activeScreen])
 
   if ((loading || isInitialLoad) && !authTimeout) {
     return (
@@ -285,7 +289,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
         {activeScreen !== "record" && <WorkoutIndicator />}
 
         {/* Main Content */}
-        <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">{renderActiveScreen()}</main>
+        <main className="pb-20 min-h-[calc(100vh-144px)] hw-accelerate">{renderActiveScreen}</main>
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-50">
@@ -298,8 +302,10 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
                 <button
                   key={screen.id}
                   onClick={() => {
-                    // Immediate navigation without loading state
-                    router.push(screen.path)
+                    // Instant tab switching without routing
+                    setActiveScreen(screen.id)
+                    // Update URL for browser navigation support but don't wait
+                    router.replace(screen.path, undefined)
                   }}
                   className={cn(
                     "flex flex-col items-center justify-center flex-1 py-2 px-1 transition-all duration-200",
