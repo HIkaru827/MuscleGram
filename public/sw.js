@@ -1,14 +1,12 @@
-const CACHE_NAME = 'musclegram-v7'
-const STATIC_CACHE = 'static-v7'
-const DYNAMIC_CACHE = 'dynamic-v7'
+const CACHE_NAME = 'musclegram-v8'
+const STATIC_CACHE = 'static-v8'
+const DYNAMIC_CACHE = 'dynamic-v8'
 
 // Critical resources that should be cached immediately
 const urlsToCache = [
   '/',
-  '/icon-192x192.png',
-  '/icon-512x512.png', 
-  '/app_logo.png',
   '/manifest.json'
+  // Remove icon preloading - they'll be cached when actually requested
 ]
 
 // Resources that should be cached dynamically

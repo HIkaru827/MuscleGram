@@ -4,11 +4,13 @@ import { useEffect } from 'react'
 
 export default function PerformanceOptimizer() {
   useEffect(() => {
-    // Preload critical resources
+    // Skip preloading images that aren't immediately visible
+    // PWA icons and logos are already cached by service worker
     const preloadCriticalResources = () => {
+      // Only preload resources that are immediately visible and critical
       const criticalResources = [
-        '/icon-192x192.png',
-        '/app_logo.png'
+        // Remove image preloading to avoid warnings
+        // These will be loaded when actually needed
       ]
       
       criticalResources.forEach(resource => {
@@ -18,6 +20,8 @@ export default function PerformanceOptimizer() {
         
         if (resource.endsWith('.css')) {
           link.as = 'style'
+        } else if (resource.endsWith('.js')) {
+          link.as = 'script'
         } else if (resource.match(/\.(jpg|jpeg|png|webp|avif)$/)) {
           link.as = 'image'
         }
@@ -51,15 +55,39 @@ export default function PerformanceOptimizer() {
       })
     }
     
-    // Optimize images
+    // Optimize images - apply lazy loading to all images except logos
     const optimizeImages = () => {
       const images = document.querySelectorAll('img')
       images.forEach(img => {
-        if (!img.loading) {
+        // Skip lazy loading for immediately visible logos/icons
+        const isLogo = img.src.includes('app_logo.png') || 
+                      img.src.includes('icon-192x192.png') ||
+                      img.alt?.includes('logo') ||
+                      img.className?.includes('logo')
+        
+        if (!isLogo && !img.loading) {
           img.loading = 'lazy'
         }
         if (!img.decoding) {
           img.decoding = 'async'
+        }
+        
+        // Add intersection observer for better lazy loading
+        if (!isLogo && 'IntersectionObserver' in window) {
+          const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                const img = entry.target as HTMLImageElement
+                if (img.dataset.src) {
+                  img.src = img.dataset.src
+                  img.removeAttribute('data-src')
+                  observer.unobserve(img)
+                }
+              }
+            })
+          }, { threshold: 0.1 })
+          
+          observer.observe(img)
         }
       })
     }
@@ -81,7 +109,7 @@ export default function PerformanceOptimizer() {
           
           // Delete any old cache versions
           const oldCaches = cacheNames.filter(name => 
-            name.includes('musclegram') && !name.includes('v7')
+            name.includes('musclegram') && !name.includes('v8')
           )
           
           await Promise.all(
