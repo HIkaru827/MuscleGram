@@ -178,6 +178,10 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedWorkouts, setSelectedWorkouts] = useState<WorkoutDay['workouts']>([])
   const [showDetailModal, setShowDetailModal] = useState(false)
+  
+  // スワイプ関連のstate
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -293,6 +297,49 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
     } finally {
       setLoading(false)
     }
+  }
+
+  // スワイプジェスチャーの最小距離（ピクセル）
+  const minSwipeDistance = 50
+  
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null) // リセット
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    })
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    })
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    
+    const distanceX = touchStart.x - touchEnd.x
+    const distanceY = touchStart.y - touchEnd.y
+    const isLeftSwipe = distanceX > minSwipeDistance
+    const isRightSwipe = distanceX < -minSwipeDistance
+    
+    // 垂直方向のスワイプが水平方向より大きい場合は無視
+    if (Math.abs(distanceY) > Math.abs(distanceX)) return
+    
+    if (isLeftSwipe) {
+      // 左スワイプ → 次月へ
+      setCurrentMonth(addMonths(currentMonth, 1))
+    }
+    if (isRightSwipe) {
+      // 右スワイプ → 前月へ
+      setCurrentMonth(subMonths(currentMonth, 1))
+    }
+    
+    // リセット
+    setTouchStart(null)
+    setTouchEnd(null)
   }
 
   const handleDateClick = (date: Date) => {
@@ -447,7 +494,12 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
           </div>
           
           {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-0 border border-gray-200 rounded-lg overflow-hidden">
+          <div 
+            className="grid grid-cols-7 gap-0 border border-gray-200 rounded-lg overflow-hidden"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
             {/* Day headers */}
             {['月', '火', '水', '木', '金', '土', '日'].map((day) => (
               <div key={day} className="p-2 text-center text-sm font-medium text-gray-700 bg-gray-50 border-b border-gray-200">
