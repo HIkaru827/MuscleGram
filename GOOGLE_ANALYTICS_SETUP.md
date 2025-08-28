@@ -4,29 +4,25 @@ MuscleGramアプリにGoogle Analytics 4 (GA4)が統合されました。以下�
 
 ## 1. Google Analytics 4の設定
 
-### GA4プロパティの作成
-1. [Google Analytics](https://analytics.google.com/)にアクセス
-2. 「管理」→「プロパティを作成」
-3. プロパティ名: `MuscleGram`
-4. レポートのタイムゾーン: `日本`
-5. 通貨: `日本円 (JPY)`
+✅ **すでに設定済み**: Google Analytics ID `G-PWQPJNRZ73` がハードコードされています。
 
-### 測定IDの取得
-1. 「管理」→「データストリーム」
-2. 「ストリームを追加」→「ウェブ」
-3. ウェブサイトURL: `https://yourdomain.com`
-4. ストリーム名: `MuscleGram Web`
-5. **測定ID（G-XXXXXXXXXX）をコピー**
+### 現在の設定
+- **測定ID**: `G-PWQPJNRZ73`
+- **実装方法**: 手動インストール（推奨）
+- **配置場所**: `app/layout.tsx` の `<head>` セクション
 
 ## 2. 環境変数の設定
 
-### .env.localファイルを作成
-```bash
-# .env.local
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
-```
+**不要**: Google Analytics IDは直接コードに組み込まれているため、環境変数の設定は不要です。
 
-**重要**: 本番環境（Vercel/Netlifyなど）でも同じ環境変数を設定してください。
+### .env.localファイル
+```bash
+# .env.local (Google Analytics設定は不要)
+# Firebase設定のみ必要
+NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-auth-domain
+# ... その他のFirebase設定
+```
 
 ## 3. 実装されている機能
 

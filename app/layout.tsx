@@ -118,23 +118,19 @@ export default function RootLayout({
       <body className={inter.className}>
         <StructuredData />
         <PerformanceOptimizer />
-        {/* Google Analytics */}
-        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
-          <>
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`} />
-            <script dangerouslySetInnerHTML={{
-              __html: `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}', {
-                  page_path: window.location.pathname,
-                  cookie_flags: 'SameSite=None;Secure'
-                });
-              `
-            }} />
-          </>
-        )}
+        {/* Google tag (gtag.js) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-PWQPJNRZ73" />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-PWQPJNRZ73', {
+              page_path: window.location.pathname,
+              cookie_flags: 'SameSite=None;Secure'
+            });
+          `
+        }} />
         
         <script dangerouslySetInnerHTML={{
           __html: `

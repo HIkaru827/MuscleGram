@@ -7,12 +7,32 @@ declare global {
   }
 }
 
-// Google Analytics Measurement ID (環境変数から取得)
-export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+// Google Analytics Measurement ID (固定値)
+export const GA_MEASUREMENT_ID = 'G-PWQPJNRZ73'
 
 // Google Analyticsが有効かどうかをチェック
 export const isAnalyticsEnabled = () => {
-  return typeof window !== 'undefined' && GA_MEASUREMENT_ID && !isDebugMode()
+  return typeof window !== 'undefined' && GA_MEASUREMENT_ID && !isDebugMode() && isCookieConsentGiven()
+}
+
+// Cookie同意状態をチェック
+const isCookieConsentGiven = () => {
+  if (typeof window === 'undefined') return false
+  
+  const consent = localStorage.getItem('cookieConsent')
+  const preferences = localStorage.getItem('cookiePreferences')
+  
+  if (consent === 'accepted') return true
+  if (consent === 'partial' || consent === 'custom') {
+    try {
+      const prefs = JSON.parse(preferences || '{}')
+      return prefs.analytics === true
+    } catch {
+      return false
+    }
+  }
+  
+  return false
 }
 
 // デバッグモードかどうかをチェック
