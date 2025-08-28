@@ -1,9 +1,14 @@
-import { gtag } from 'gtag'
-
 declare global {
   interface Window {
     gtag: (...args: any[]) => void
     dataLayer: any[]
+  }
+}
+
+// gtag関数のヘルパー
+function gtag(...args: any[]) {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag(...args)
   }
 }
 
