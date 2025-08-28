@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ChevronLeft, ChevronRight, Zap, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -177,9 +177,14 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
   const [currentMonth, setCurrentMonth] = useState(selectedMonth || new Date())
   const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([])
   const [loading, setLoading] = useState(true)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedWorkouts, setSelectedWorkouts] = useState<WorkoutDay['workouts']>([])
   const [showDetailModal, setShowDetailModal] = useState(false)
+  
+  // データキャッシュ用のRef
+  const dataCache = useRef<Map<string, { workoutDays: WorkoutDay[], timestamp: number }>>(new Map())
+  const CACHE_DURATION = 5 * 60 * 1000 // 5分間キャッシュ
   
   // スワイプ関連のstate
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
@@ -198,16 +203,35 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
     }
   }, [user, currentMonth])
 
-  // refreshTriggerが変更された時にデータを再読み込み
+  // refreshTriggerが変更された時にキャッシュをクリアして再読み込み
   useEffect(() => {
     if (user && refreshTrigger) {
       console.log('Calendar refresh triggered:', refreshTrigger)
+      // キャッシュをクリアして強制再読み込み
+      const cacheKey = format(currentMonth, 'yyyy-MM')
+      dataCache.current.delete(cacheKey)
       loadWorkoutData()
     }
   }, [refreshTrigger])
 
   const loadWorkoutData = async () => {
     if (!user) return
+    
+    const cacheKey = format(currentMonth, 'yyyy-MM')
+    const cachedData = dataCache.current.get(cacheKey)
+    const now = Date.now()
+    
+    // キャッシュが有効な場合は使用
+    if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
+      // キャッシュデータの場合はスムーズなトランジション
+      setIsTransitioning(true)
+      setTimeout(() => {
+        setWorkoutDays(cachedData.workoutDays)
+        setLoading(false)
+        setIsTransitioning(false)
+      }, 150) // 短いデレイでスムーズに
+      return
+    }
     
     setLoading(true)
     try {
@@ -218,6 +242,8 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
         // Create demo workout data
         const demoWorkouts = createDemoWorkoutData()
         setWorkoutDays(demoWorkouts)
+        // デモデータもキャッシュ
+        dataCache.current.set(cacheKey, { workoutDays: demoWorkouts, timestamp: now })
         setLoading(false)
         return
       }
@@ -300,11 +326,22 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
         }
       })
       
-      setWorkoutDays(Array.from(workoutMap.values()))
+      const finalWorkoutDays = Array.from(workoutMap.values())
+      setWorkoutDays(finalWorkoutDays)
+      
+      // データをキャッシュに保存
+      dataCache.current.set(cacheKey, { workoutDays: finalWorkoutDays, timestamp: now })
+      
+      // キャッシュサイズ制限（最新10ヶ月分のみ保持）
+      if (dataCache.current.size > 10) {
+        const oldestKey = Array.from(dataCache.current.keys()).sort()[0]
+        dataCache.current.delete(oldestKey)
+      }
     } catch (error) {
       console.error('Error loading workout data:', error)
     } finally {
       setLoading(false)
+      setIsTransitioning(false)
     }
   }
 
@@ -340,14 +377,20 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
     if (isLeftSwipe) {
       // 左スワイプ → 次月へ
       const nextMonth = addMonths(currentMonth, 1)
+      setIsTransitioning(true)
       setCurrentMonth(nextMonth)
       onMonthChange?.(nextMonth)
+      // 軽微なローディング状態を設定（キャッシュがあれば即座に解除される）
+      setLoading(true)
     }
     if (isRightSwipe) {
       // 右スワイプ → 前月へ
       const prevMonth = subMonths(currentMonth, 1)
+      setIsTransitioning(true)
       setCurrentMonth(prevMonth)
       onMonthChange?.(prevMonth)
+      // 軽微なローディング状態を設定（キャッシュがあれば即座に解除される）
+      setLoading(true)
     }
     
     // リセット
@@ -451,7 +494,7 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
     )
   }
 
-  if (loading) {
+  if (loading && !isTransitioning) {
     return (
       <Card className="w-full">
         <CardContent className="p-4">
@@ -478,8 +521,11 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
               size="sm"
               onClick={() => {
                 const prevMonth = subMonths(currentMonth, 1)
+                setIsTransitioning(true)
                 setCurrentMonth(prevMonth)
                 onMonthChange?.(prevMonth)
+                // 軽微なローディング状態を設定（キャッシュがあれば即座に解除される）
+                setLoading(true)
               }}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -494,8 +540,11 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
               size="sm"
               onClick={() => {
                 const nextMonth = addMonths(currentMonth, 1)
+                setIsTransitioning(true)
                 setCurrentMonth(nextMonth)
                 onMonthChange?.(nextMonth)
+                // 軽微なローディング状態を設定（キャッシュがあれば即座に解除される）
+                setLoading(true)
               }}
             >
               <ChevronRight className="w-4 h-4" />
@@ -516,7 +565,10 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
           
           {/* Calendar Grid */}
           <div 
-            className="grid grid-cols-7 gap-0 border border-gray-200 rounded-lg overflow-hidden"
+            className={cn(
+              "grid grid-cols-7 gap-0 border border-gray-200 rounded-lg overflow-hidden transition-all duration-300",
+              isTransitioning && "opacity-75 scale-[0.98]"
+            )}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
