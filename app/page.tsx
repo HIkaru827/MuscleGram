@@ -19,6 +19,7 @@ import AnalyticsScreen from '@/components/analytics-screen'
 import CommunityScreen from '@/components/community-screen'
 import ProfileScreen from '@/components/profile-screen'
 import LoginScreen from "@/components/auth/login-screen"
+import BrandingPage from "@/components/branding-page"
 import WorkoutIndicator from "@/components/workout-indicator"
 import MobileErrorBoundary from "@/components/mobile-error-boundary"
 
@@ -42,6 +43,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
   const [activeScreen, setActiveScreen] = useState<Screen>(defaultScreen)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [authTimeout, setAuthTimeout] = useState(false)
+  const [showBranding, setShowBranding] = useState(true)
   const { logApp, markFirstRender } = useDebugger()
   const { trackRouteChange } = usePerformanceMonitor()
 
@@ -64,11 +66,15 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     return 'home'
   }
 
-  // URLが変更された時にactiveScreenを同期
+  // URLが変更された時にactiveScreenを同期（初期読み込み時のみ）
   useEffect(() => {
     const startTime = performance.now()
     const screenFromPath = getScreenFromPath(pathname)
-    setActiveScreen(screenFromPath)
+    
+    // 初期読み込み時のみactiveScreenを同期
+    if (isInitialLoad) {
+      setActiveScreen(screenFromPath)
+    }
     
     // パフォーマンス追跡 - モバイル互換性対応
     if (typeof requestIdleCallback === 'function') {
@@ -81,7 +87,7 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
         trackRouteChange(pathname, startTime)
       }, 0)
     }
-  }, [pathname, trackRouteChange])
+  }, [pathname, trackRouteChange, isInitialLoad])
 
   // Listen for navigate to record event
   React.useEffect(() => {
@@ -225,6 +231,11 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     )
   }
 
+  // Show branding page first for non-authenticated users
+  if (!user && !authTimeout && showBranding) {
+    return <BrandingPage onGetStarted={() => setShowBranding(false)} />
+  }
+
   if (!user && !authTimeout) {
     return <LoginScreen />
   }
@@ -302,10 +313,10 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
                 <button
                   key={screen.id}
                   onClick={() => {
-                    // Instant tab switching without routing
+                    // Instant tab switching - only update state, no routing
                     setActiveScreen(screen.id)
-                    // Update URL for browser navigation support but don't wait
-                    router.replace(screen.path, undefined)
+                    // Update URL silently without triggering re-renders
+                    window.history.replaceState(null, '', screen.path)
                   }}
                   className={cn(
                     "flex flex-col items-center justify-center flex-1 py-2 px-1 transition-all duration-200",

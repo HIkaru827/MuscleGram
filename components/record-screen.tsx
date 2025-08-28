@@ -182,12 +182,27 @@ export default function RecordScreen() {
   })
   const [recordDate, setRecordDate] = useState<string>('')
   const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState<number>(0)
+  const [selectedCalendarMonth, setSelectedCalendarMonth] = useState<Date>(new Date())
 
   // 初期化：デフォルトでライブ記録モードに設定
   useEffect(() => {
     setRecordMode('live')
     setRecordDate('')
     setManualTimeInput({ startTime: '', endTime: '' })
+    
+    // 他のタブから戻ってきた場合（セッションストレージから判定）、今月にリセット
+    const hasLeftRecord = sessionStorage.getItem('hasLeftRecordTab') === 'true'
+    if (hasLeftRecord) {
+      setSelectedCalendarMonth(new Date())
+      sessionStorage.removeItem('hasLeftRecordTab')
+    }
+  }, [])
+  
+  // コンポーネントがアンマウントされる時（他のタブに移動時）を記録
+  useEffect(() => {
+    return () => {
+      sessionStorage.setItem('hasLeftRecordTab', 'true')
+    }
   }, [])
 
   // ワークアウト状態の変化を監視して適切にタイマーを制御
@@ -312,6 +327,9 @@ export default function RecordScreen() {
   const handleCalendarNavigation = (clickedDate: Date, isToday: boolean) => {
     // ローカルタイムゾーンを考慮した日付文字列を生成
     const dateStr = format(clickedDate, 'yyyy-MM-dd')
+    
+    // クリックした日付の月を保存（記録完了後もこの月を維持）
+    setSelectedCalendarMonth(clickedDate)
     
     console.log('Calendar navigation:', {
       clickedDate,
@@ -607,6 +625,7 @@ export default function RecordScreen() {
         setRecordMode('live')
         setRecordDate('')
         setManualTimeInput({ startTime: '', endTime: '' })
+        // 注意：selectedCalendarMonth は維持する（月を保持）
       }
 
     } catch (error) {
@@ -1042,6 +1061,8 @@ export default function RecordScreen() {
         <WorkoutCalendar 
           onNavigateToRecord={handleCalendarNavigation}
           refreshTrigger={calendarRefreshTrigger}
+          selectedMonth={selectedCalendarMonth}
+          onMonthChange={setSelectedCalendarMonth}
         />
       </div>
       

@@ -50,6 +50,8 @@ interface WorkoutCalendarProps {
   onDateSelect?: (date: Date, workouts: WorkoutDay['workouts']) => void
   onNavigateToRecord?: (date: Date, isToday: boolean) => void
   refreshTrigger?: number // 外部からリフレッシュをトリガーするためのプロパティ
+  selectedMonth?: Date // 外部から月を制御するためのプロパティ
+  onMonthChange?: (month: Date) => void // 月変更時のコールバック
 }
 
 const muscleGroupColors = {
@@ -170,9 +172,9 @@ const createDemoWorkoutData = (): WorkoutDay[] => {
   })
 }
 
-export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refreshTrigger }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refreshTrigger, selectedMonth, onMonthChange }: WorkoutCalendarProps) {
   const { user } = useAuth()
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [currentMonth, setCurrentMonth] = useState(selectedMonth || new Date())
   const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -182,6 +184,13 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
   // スワイプ関連のstate
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null)
+
+  // selectedMonthプロパティが変更された時にcurrentMonthを同期
+  useEffect(() => {
+    if (selectedMonth) {
+      setCurrentMonth(selectedMonth)
+    }
+  }, [selectedMonth])
 
   useEffect(() => {
     if (user) {
@@ -330,11 +339,15 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
     
     if (isLeftSwipe) {
       // 左スワイプ → 次月へ
-      setCurrentMonth(addMonths(currentMonth, 1))
+      const nextMonth = addMonths(currentMonth, 1)
+      setCurrentMonth(nextMonth)
+      onMonthChange?.(nextMonth)
     }
     if (isRightSwipe) {
       // 右スワイプ → 前月へ
-      setCurrentMonth(subMonths(currentMonth, 1))
+      const prevMonth = subMonths(currentMonth, 1)
+      setCurrentMonth(prevMonth)
+      onMonthChange?.(prevMonth)
     }
     
     // リセット
@@ -463,7 +476,11 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              onClick={() => {
+                const prevMonth = subMonths(currentMonth, 1)
+                setCurrentMonth(prevMonth)
+                onMonthChange?.(prevMonth)
+              }}
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -475,7 +492,11 @@ export default function WorkoutCalendar({ onDateSelect, onNavigateToRecord, refr
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              onClick={() => {
+                const nextMonth = addMonths(currentMonth, 1)
+                setCurrentMonth(nextMonth)
+                onMonthChange?.(nextMonth)
+              }}
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
