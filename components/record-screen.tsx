@@ -33,6 +33,7 @@ import {
   getPRBadgeInfo,
   PRRecord 
 } from "@/lib/pr-utils"
+import { trackWorkoutEvent, trackUserEvent, trackConversion } from "@/lib/analytics"
 
 interface Exercise {
   id: string
@@ -307,6 +308,9 @@ export default function RecordScreen() {
   }
 
   const startWorkout = () => {
+    // アナリティクス追跡
+    trackWorkoutEvent.start(recordMode)
+    
     if (recordMode === 'manual') {
       // 手動記録モードでは即座にワークアウトを開始
       startWorkoutContext()
@@ -320,6 +324,9 @@ export default function RecordScreen() {
   }
 
   const handleAddExerciseToWorkout = (exercise: Exercise) => {
+    // アナリティクス追跡
+    trackWorkoutEvent.exerciseAdded(exercise.name)
+    
     addExerciseToWorkout(exercise.id, exercise.name, exercise.lastPerformed)
   }
 
@@ -593,6 +600,24 @@ export default function RecordScreen() {
           savePR({ ...pr, workoutId: postRef.id })
         )
       )
+      
+      // アナリティクス追跡 - ワークアウト完了
+      const exerciseCount = currentWorkout.length
+      const totalSets = currentWorkout.reduce((sum, entry) => sum + entry.sets.length, 0)
+      trackWorkoutEvent.complete(duration, exerciseCount, totalSets)
+      
+      // アナリティクス追跡 - 投稿
+      trackWorkoutEvent.post(selectedPhotos.length > 0, postComment.length)
+      
+      // PRイベント追跡
+      calculatedPRs.forEach(pr => {
+        trackWorkoutEvent.prAchieved(pr.exerciseName, pr.prType, pr.improvement || 0)
+      })
+      
+      // コンバージョン追跡
+      if (calculatedPRs.length > 0) {
+        trackConversion('first_pr')
+      }
       
       if (calculatedPRs.length > 0) {
         setShowPRCelebration(true)

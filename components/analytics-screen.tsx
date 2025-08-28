@@ -14,6 +14,16 @@ import { WorkoutPost } from "@/types"
 import { format, subDays, startOfWeek, startOfMonth, isAfter } from "date-fns"
 import { ja } from "date-fns/locale"
 import { PRRecord, calculateE1RM, formatE1RM, findBestE1RMSet, getPRBadgeInfo, groupPRsByWeek, formatPRDate, getPRCategory, PR_CATEGORIES } from "@/lib/pr-utils"
+import { 
+  loadRecordMuscleGroups, 
+  convertToAnalyticsMuscleGroups, 
+  extractAvailableExercises,
+  MuscleGroupDefinition,
+  getMuscleGroupNameById,
+  getMuscleGroupIdByExercise
+} from "@/lib/muscle-groups"
+import { trackNavigationEvent, trackPerformanceEvent } from "@/lib/analytics"
+import { usePageAnalytics } from "@/hooks/useAnalytics"
 import PRTrendModal from "./PR/PRTrendModal"
 import MuscleGroupAnalysis from "./PR/MuscleGroupAnalysis"
 import EnhancedWeeklyPRs from "./enhanced-weekly-prs"
@@ -29,42 +39,14 @@ interface AnalyticsData {
   exerciseProgress: { exercise: string; progress: { date: string; maxWeight: number }[] }[]
 }
 
-// 部位・種目フィルター定義
-const MUSCLE_GROUPS = [
-  {
-    id: "chest",
-    name: "胸",
-    exercises: ["ベンチプレス", "インクラインプレス", "ダンベルフライ", "ペックフライ", "プッシュアップ", "ディップス"]
-  },
-  {
-    id: "back", 
-    name: "背中",
-    exercises: ["ラットプルダウン", "チンニング", "ベントオーバーロウ", "ケーブルロー", "デッドリフト", "シュラッグ", "ローイング"]
-  },
-  {
-    id: "legs",
-    name: "脚",
-    exercises: ["スクワット", "レッグプレス", "レッグエクステンション", "レッグカール", "カーフレイズ", "ランジ", "ブルガリアンスクワット"]
-  },
-  {
-    id: "shoulders",
-    name: "肩",
-    exercises: ["ショルダープレス", "サイドレイズ", "フロントレイズ", "リアデルト", "アップライトロウ", "ダンベルプレス"]
-  },
-  {
-    id: "arms",
-    name: "腕",
-    exercises: ["バーベルカール", "ダンベルカール", "ハンマーカール", "トライセプスエクステンション", "フレンチプレス", "ディップス"]
-  },
-  {
-    id: "abs",
-    name: "腹",
-    exercises: ["プランク", "クランチ", "シットアップ", "レッグレイズ", "ロシアンツイスト", "マウンテンクライマー"]
-  }
-]
+// 動的に読み込まれる部位・種目データ
+let DYNAMIC_MUSCLE_GROUPS: MuscleGroupDefinition[] = []
 
 export default function AnalyticsScreen() {
   const { user } = useAuth()
+  
+  // ページアナリティクス
+  usePageAnalytics('analytics')
   const [selectedExercise, setSelectedExercise] = useState("all")
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("all") 
   const [timeRange, setTimeRange] = useState("all")
@@ -83,6 +65,7 @@ export default function AnalyticsScreen() {
     trendData: PRRecord[]
   } | null>(null)
   const [availableExercises, setAvailableExercises] = useState<string[]>([])
+  const [muscleGroups, setMuscleGroups] = useState<MuscleGroupDefinition[]>([])
 
   const openTrendModal = async (exerciseName: string, prType: PRRecord['prType']) => {
     if (!user) return
@@ -124,7 +107,7 @@ export default function AnalyticsScreen() {
     
     // 部位フィルター
     const muscleGroupExercises = selectedMuscleGroup !== "all" 
-      ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises || []
+      ? muscleGroups.find(g => g.id === selectedMuscleGroup)?.exercises || []
       : []
     
     // 種目フィルター
@@ -260,7 +243,7 @@ export default function AnalyticsScreen() {
     }
     
     return { filteredData, filteredPosts }
-  }, [selectedMuscleGroup, selectedExercise])
+  }, [selectedMuscleGroup, selectedExercise, muscleGroups])
 
   // PRデータをフィルタリングする関数
   const filterPRs = useCallback((prs: PRRecord[]) => {
@@ -269,7 +252,7 @@ export default function AnalyticsScreen() {
     }
     
     const muscleGroupExercises = selectedMuscleGroup !== "all" 
-      ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises || []
+      ? muscleGroups.find(g => g.id === selectedMuscleGroup)?.exercises || []
       : []
     
     return prs.filter(pr => {
@@ -277,7 +260,25 @@ export default function AnalyticsScreen() {
       if (selectedMuscleGroup !== "all" && !muscleGroupExercises.includes(pr.exerciseName)) return false
       return true
     })
-  }, [selectedMuscleGroup, selectedExercise])
+  }, [selectedMuscleGroup, selectedExercise, muscleGroups])
+
+  // 記録タブのデータを読み込んで筋肉部位・種目を同期
+  useEffect(() => {
+    const recordMuscleGroups = loadRecordMuscleGroups()
+    const analyticsMuscleGroups = convertToAnalyticsMuscleGroups(recordMuscleGroups)
+    const exercises = extractAvailableExercises(recordMuscleGroups)
+    
+    DYNAMIC_MUSCLE_GROUPS = analyticsMuscleGroups
+    setMuscleGroups(analyticsMuscleGroups)
+    setAvailableExercises(exercises)
+    
+    console.log('Loaded muscle groups from record tab:', {
+      recordGroups: recordMuscleGroups.length,
+      analyticsGroups: analyticsMuscleGroups.length,
+      totalExercises: exercises.length,
+      exercises: exercises.slice(0, 10) // 最初の10個を表示
+    })
+  }, [])
 
   const loadAnalyticsData = useCallback(async () => {
       if (!user) {
@@ -308,10 +309,9 @@ export default function AnalyticsScreen() {
           exerciseProgress: []
         }
         
-        // 元データと利用可能な種目を保存
+        // 元データを保存（利用可能な種目は既にuseEffectで設定済み）
         setOriginalAnalyticsData(demoData)
         setOriginalPosts([])
-        setAvailableExercises(demoData.favoriteExercises.map(ex => ex.name))
         
         // フィルターを適用してセット
         const { filteredData } = applyFilters(demoData, [])
@@ -483,10 +483,16 @@ export default function AnalyticsScreen() {
           exerciseProgress
         }
         
-        // 元データと利用可能な種目を保存
+        // 元データを保存（利用可能な種目は既にuseEffectで設定済み）
         setOriginalAnalyticsData(fullData)
         setOriginalPosts(filteredPosts)
-        setAvailableExercises(favoriteExercises.map(ex => ex.name))
+        
+        // 実際のデータから利用可能な種目を更新
+        const actualExercises = new Set<string>()
+        filteredPosts.forEach(post => {
+          post.exercises.forEach(ex => actualExercises.add(ex.name))
+        })
+        setAvailableExercises(Array.from(actualExercises).sort())
         
         // Load PR data
         const [weeklyPRsData, allPRsData] = await Promise.all([
@@ -508,7 +514,7 @@ export default function AnalyticsScreen() {
       } finally {
         setLoading(false)
       }
-    }, [user, timeRange])
+    }, [user, timeRange, muscleGroups])
 
   useEffect(() => {
     loadAnalyticsData()
@@ -582,7 +588,12 @@ export default function AnalyticsScreen() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">分析</h2>
-        <Select value={timeRange} onValueChange={setTimeRange}>
+        <Select value={timeRange} onValueChange={(value) => {
+          // アナリティクス追跡
+          trackNavigationEvent.filterUsage('time_range', value)
+          
+          setTimeRange(value)
+        }}>
           <SelectTrigger className="w-32 bg-white">
             <SelectValue />
           </SelectTrigger>
@@ -677,6 +688,9 @@ export default function AnalyticsScreen() {
               <div className="flex flex-col">
                 <label className="text-xs text-gray-500 mb-1">部位</label>
                 <Select value={selectedMuscleGroup} onValueChange={(value) => {
+                  // アナリティクス追跡
+                  trackNavigationEvent.filterUsage('muscle_group', value)
+                  
                   setSelectedMuscleGroup(value)
                   if (value !== "all") setSelectedExercise("all") // 部位選択時は種目をリセット
                 }}>
@@ -685,7 +699,7 @@ export default function AnalyticsScreen() {
                   </SelectTrigger>
                   <SelectContent className="bg-white">
                     <SelectItem value="all">全部位</SelectItem>
-                    {MUSCLE_GROUPS.map(group => (
+                    {muscleGroups.map(group => (
                       <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -695,14 +709,19 @@ export default function AnalyticsScreen() {
               {/* 種目フィルター */}
               <div className="flex flex-col">
                 <label className="text-xs text-gray-500 mb-1">種目</label>
-                <Select value={selectedExercise} onValueChange={setSelectedExercise}>
+                <Select value={selectedExercise} onValueChange={(value) => {
+                  // アナリティクス追跡
+                  trackNavigationEvent.filterUsage('exercise', value)
+                  
+                  setSelectedExercise(value)
+                }}>
                   <SelectTrigger className="w-32 sm:w-40 h-8 text-xs bg-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
                     <SelectItem value="all">全種目</SelectItem>
                     {(selectedMuscleGroup !== "all" 
-                      ? MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.exercises.filter(ex => 
+                      ? muscleGroups.find(g => g.id === selectedMuscleGroup)?.exercises.filter(ex => 
                           availableExercises.includes(ex)
                         ) || []
                       : availableExercises
@@ -738,7 +757,7 @@ export default function AnalyticsScreen() {
               <div className="flex flex-wrap gap-2">
                 {selectedMuscleGroup !== "all" && (
                   <Badge variant="secondary" className="text-xs">
-                    部位: {MUSCLE_GROUPS.find(g => g.id === selectedMuscleGroup)?.name}
+                    部位: {getMuscleGroupNameById(selectedMuscleGroup, muscleGroups)}
                   </Badge>
                 )}
                 {selectedExercise !== "all" && (

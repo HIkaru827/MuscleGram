@@ -7,6 +7,7 @@ import { WorkoutProvider } from "@/contexts/WorkoutContext"
 import PWAInstallPrompt from "@/components/pwa-install"
 import StructuredData from "@/components/structured-data"
 import PerformanceOptimizer from "@/components/performance-optimizer"
+import CookieConsent from "@/components/cookie-consent"
 import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -104,6 +105,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
         <link rel="dns-prefetch" href="https://firebase.googleapis.com" />
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
         <style>{`
           .skeleton-box{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:loading 2s infinite}
           @keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -115,11 +118,40 @@ export default function RootLayout({
       <body className={inter.className}>
         <StructuredData />
         <PerformanceOptimizer />
+        {/* Google Analytics */}
+        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`} />
+            <script dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}', {
+                  page_path: window.location.pathname,
+                  cookie_flags: 'SameSite=None;Secure'
+                });
+              `
+            }} />
+          </>
+        )}
+        
         <script dangerouslySetInnerHTML={{
           __html: `
             // Mobile-specific error handling
             window.addEventListener('error', function(e) {
               console.error('Global error caught:', e.error);
+              
+              // Send error to Google Analytics if available
+              if (typeof gtag !== 'undefined') {
+                gtag('event', 'exception', {
+                  description: e.message || 'Unknown error',
+                  fatal: false,
+                  event_category: 'javascript_error',
+                  event_label: e.filename || 'unknown_file'
+                });
+              }
+              
               // Send error to console for debugging
               if (typeof e.error === 'object') {
                 console.error('Error details:', {
@@ -135,6 +167,16 @@ export default function RootLayout({
             
             window.addEventListener('unhandledrejection', function(e) {
               console.error('Unhandled promise rejection:', e.reason);
+              
+              // Send error to Google Analytics if available
+              if (typeof gtag !== 'undefined') {
+                gtag('event', 'exception', {
+                  description: 'Unhandled Promise Rejection: ' + (e.reason || 'Unknown'),
+                  fatal: false,
+                  event_category: 'promise_rejection'
+                });
+              }
+              
               // Prevent default behavior that shows error page
               e.preventDefault();
             });
@@ -144,6 +186,7 @@ export default function RootLayout({
           <WorkoutProvider>
             {children}
             <PWAInstallPrompt />
+            <CookieConsent />
             <Toaster position="top-center" richColors />
           </WorkoutProvider>
         </AuthProvider>
