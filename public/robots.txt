@@ -1,0 +1,36 @@
+User-agent: *
+Allow: /
+
+# Important pages
+Allow: /home
+Allow: /record
+Allow: /analytics
+Allow: /analysis
+Allow: /community
+Allow: /profile
+Allow: /login
+Allow: /signup
+
+# Block private/admin areas
+Disallow: /api/
+Disallow: /_next/
+Disallow: /admin/
+Disallow: /private/
+
+# Allow search engines to crawl images and static assets
+Allow: /images/
+Allow: /icons/
+Allow: /*.css$
+Allow: /*.js$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.gif$
+Allow: /*.svg$
+Allow: /*.webp$
+
+# Sitemap location
+Sitemap: https://musclegram.net/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
