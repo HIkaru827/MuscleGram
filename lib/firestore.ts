@@ -201,6 +201,29 @@ export const toggleLike = async (postId: string, userId: string) => {
         likedBy: arrayUnion(userId),
         updatedAt: serverTimestamp(),
       })
+
+      // Create notification for the post owner (if not liking own post)
+      if (postData.userId !== userId) {
+        try {
+          // Get the user who liked the post
+          const likerUser = await getUser(userId)
+          
+          if (likerUser) {
+            await createNotification({
+              type: 'like',
+              title: 'いいねされました',
+              message: `${likerUser.displayName || 'ユーザー'}さんがあなたの投稿にいいねしました`,
+              recipientId: postData.userId,
+              fromUserId: userId,
+              relatedPostId: postId,
+              actionUrl: '/home'
+            })
+          }
+        } catch (notificationError) {
+          console.error('Error creating like notification:', notificationError)
+          // Don't throw error for notification failure - like should still work
+        }
+      }
     }
 
     return !isLiked
@@ -225,6 +248,35 @@ export const createComment = async (commentData: Omit<Comment, 'id' | 'createdAt
       comments: increment(1),
       updatedAt: serverTimestamp(),
     })
+
+    // Get post data to find the post owner
+    const postSnap = await getDoc(postRef)
+    if (postSnap.exists()) {
+      const postData = postSnap.data() as WorkoutPost
+      
+      // Create notification for the post owner (if not commenting on own post)
+      if (postData.userId !== commentData.userId) {
+        try {
+          // Get the user who commented
+          const commenterUser = await getUser(commentData.userId)
+          
+          if (commenterUser) {
+            await createNotification({
+              type: 'comment',
+              title: 'コメントされました',
+              message: `${commenterUser.displayName || 'ユーザー'}さんがあなたの投稿にコメントしました: "${commentData.text.slice(0, 50)}${commentData.text.length > 50 ? '...' : ''}"`,
+              recipientId: postData.userId,
+              fromUserId: commentData.userId,
+              relatedPostId: commentData.postId,
+              actionUrl: '/home'
+            })
+          }
+        } catch (notificationError) {
+          console.error('Error creating comment notification:', notificationError)
+          // Don't throw error for notification failure - comment should still work
+        }
+      }
+    }
 
     return docRef
   } catch (error) {
@@ -279,6 +331,25 @@ export const followUser = async (followerId: string, followingId: string) => {
         updatedAt: serverTimestamp(),
       }),
     ])
+
+    // Create notification for the followed user
+    try {
+      const followerUser = await getUser(followerId)
+      
+      if (followerUser) {
+        await createNotification({
+          type: 'follow',
+          title: '新しいフォロワー',
+          message: `${followerUser.displayName || 'ユーザー'}さんがあなたをフォローしました`,
+          recipientId: followingId,
+          fromUserId: followerId,
+          actionUrl: '/profile'
+        })
+      }
+    } catch (notificationError) {
+      console.error('Error creating follow notification:', notificationError)
+      // Don't throw error for notification failure - follow should still work
+    }
   } catch (error) {
     console.error('Error following user:', error)
     throw error
