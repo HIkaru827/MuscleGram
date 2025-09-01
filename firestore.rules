@@ -19,13 +19,20 @@ service cloud.firestore {
       }
     }
     
-    // Workout posts: read by all, write only by owner
+    // Workout posts: read by all, write only by owner, except for likes
     match /workout_posts/{postId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.userId;
-      allow update, delete: if request.auth != null && 
+      allow delete: if request.auth != null && 
         request.auth.uid == resource.data.userId;
+      // Allow owner to update all fields
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      // Allow any authenticated user to update likes and likedBy fields
+      allow update: if request.auth != null && 
+        request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['likes', 'likedBy', 'updatedAt']);
     }
     
     // Personal records: read and write only by owner
