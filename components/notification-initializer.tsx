@@ -15,32 +15,40 @@ export function NotificationInitializer() {
 
   const initializeNotifications = async () => {
     try {
-      // Initialize push notification manager
+      // Initialize push notification manager (without requesting permission yet)
       await pushNotificationManager.initialize()
       
-      // Request notification permission if not already granted
-      const permission = await pushNotificationManager.requestPermission()
+      // Check current permission status without requesting
+      const currentPermission = pushNotificationManager.getPermissionStatus()
+      console.log('Current notification permission:', currentPermission)
+      
+      // Only proceed if permission was previously granted
+      const permission = currentPermission
       
       if (permission === 'granted') {
         console.log('Notifications enabled for user:', user?.uid)
         
-        // Get FCM token and store it
-        const fcmToken = pushNotificationManager.getFCMToken()
-        if (fcmToken && user?.uid) {
-          try {
-            await fetch('/api/fcm-token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: user.uid,
-                token: fcmToken
+        // Wait a bit for FCM token to be generated, then store it
+        setTimeout(async () => {
+          const fcmToken = pushNotificationManager.getFCMToken()
+          if (fcmToken && user?.uid) {
+            try {
+              await fetch('/api/fcm-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user.uid,
+                  token: fcmToken
+                })
               })
-            })
-            console.log('FCM token stored successfully')
-          } catch (error) {
-            console.error('Failed to store FCM token:', error)
+              console.log('FCM token stored successfully')
+            } catch (error) {
+              console.error('Failed to store FCM token:', error)
+            }
+          } else {
+            console.log('No FCM token available to store')
           }
-        }
+        }, 1000)
         
         // Show a welcome notification after a brief delay
         setTimeout(() => {

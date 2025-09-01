@@ -65,8 +65,25 @@ export class PushNotificationManager {
     }
 
     try {
-      this.registration = await navigator.serviceWorker.register('/sw.js')
-      console.log('Service Worker registered:', this.registration)
+      // Register both service workers
+      const [mainSW, messagingSW] = await Promise.allSettled([
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }),
+        navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/firebase-messaging-sw.js' })
+      ])
+
+      if (mainSW.status === 'fulfilled') {
+        this.registration = mainSW.value
+        console.log('Main Service Worker registered:', this.registration)
+      } else {
+        console.error('Main Service Worker registration failed:', mainSW.reason)
+      }
+
+      if (messagingSW.status === 'fulfilled') {
+        console.log('Firebase Messaging Service Worker registered:', messagingSW.value)
+      } else {
+        console.warn('Firebase Messaging Service Worker registration failed:', messagingSW.reason)
+      }
+
       return this.registration
     } catch (error) {
       console.error('Service Worker registration failed:', error)
@@ -102,38 +119,100 @@ export class PushNotificationManager {
    * ローカル通知を表示する
    */
   async showNotification(options: PushNotificationOptions): Promise<void> {
+    console.log('showNotification called with options:', options)
+    
     const permission = await this.requestPermission()
+    console.log('Permission check result:', permission)
+    
     if (permission !== 'granted') {
       console.warn('通知許可が得られていません')
-      return
+      throw new Error('Notification permission not granted')
     }
 
     try {
-      if (this.registration) {
+      if (this.registration && this.registration.active) {
+        console.log('Using Service Worker notification, registration:', this.registration)
+        console.log('Service Worker state:', this.registration.active.state)
+        
         // Service Worker経由で通知を表示
-        await this.registration.showNotification(options.title, {
+        const notificationOptions = {
           body: options.body,
           icon: options.icon || '/icon-192.png',
           badge: options.badge || '/icon-192.png',
           image: options.image,
           tag: options.tag || 'musclegram-notification',
           data: options.data,
-          actions: options.actions,
+          actions: options.actions || [],
           requireInteraction: false,
-          silent: false
-        })
+          silent: false,
+          timestamp: Date.now(),
+          vibrate: [200, 100, 200]  // バイブレーション追加
+        }
+        
+        console.log('Showing SW notification with options:', notificationOptions)
+        await this.registration.showNotification(options.title, notificationOptions)
+        console.log('Service Worker notification API called successfully')
+        
+        // Service Worker通知が実際に表示されたか検証
+        const notifications = await this.registration.getNotifications()
+        console.log('Active notifications after showNotification:', notifications.length)
+        
+        if (notifications.length === 0) {
+          console.warn('Service Worker notification was not created, falling back to direct notification')
+          throw new Error('Service Worker notification failed silently')
+        }
+        
       } else {
-        // フォールバック: ブラウザの通知API
-        new Notification(options.title, {
-          body: options.body,
-          icon: options.icon || '/icon-192.png',
-          badge: options.badge || '/icon-192.png',
-          tag: options.tag || 'musclegram-notification',
-          data: options.data
-        })
+        console.log('Service Worker not available or not active, using direct browser notification')
+        this.createDirectNotification(options)
       }
     } catch (error) {
-      console.error('通知の表示に失敗しました:', error)
+      console.error('Service Worker通知の表示に失敗しました:', error)
+      
+      // Service Worker通知が失敗した場合、直接ブラウザ通知にフォールバック
+      try {
+        console.log('Falling back to direct browser notification')
+        this.createDirectNotification(options)
+      } catch (fallbackError) {
+        console.error('直接通知のフォールバックも失敗しました:', fallbackError)
+        throw fallbackError
+      }
+    }
+  }
+
+  /**
+   * 直接ブラウザ通知を作成する（フォールバック用）
+   */
+  private createDirectNotification(options: PushNotificationOptions): void {
+    console.log('Creating direct browser notification')
+    
+    const notification = new Notification(options.title, {
+      body: options.body,
+      icon: options.icon || '/icon-192.png',
+      badge: options.badge || '/icon-192.png',
+      tag: options.tag || 'musclegram-notification',
+      data: options.data,
+      timestamp: Date.now(),
+      requireInteraction: false
+    })
+    
+    console.log('Direct browser notification created:', notification)
+    
+    // Add click handler
+    notification.onclick = () => {
+      console.log('Direct notification clicked')
+      window.focus()
+      notification.close()
+    }
+    
+    // Add show handler
+    notification.onshow = () => {
+      console.log('Direct notification shown successfully')
+    }
+    
+    // Add error handler
+    notification.onerror = (error) => {
+      console.error('Direct notification error:', error)
     }
   }
 
@@ -201,13 +280,20 @@ export class PushNotificationManager {
     try {
       const messaging = await getMessagingInstance()
       if (!messaging) {
-        console.warn('Firebase Messaging not available')
+        console.warn('Firebase Messaging not available - using local notifications only')
         return null
       }
 
       // Get FCM token
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+      if (!vapidKey || vapidKey === 'your_vapid_key_for_push_notifications') {
+        console.warn('VAPID key not configured. Using local notifications only.')
+        console.info('To enable FCM push notifications, set NEXT_PUBLIC_FIREBASE_VAPID_KEY in your environment variables.')
+        return null
+      }
+
       const token = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        vapidKey: vapidKey
       })
 
       if (token) {
@@ -231,11 +317,11 @@ export class PushNotificationManager {
 
         return token
       } else {
-        console.warn('No FCM token available')
+        console.warn('No FCM token available - using local notifications only')
         return null
       }
     } catch (error) {
-      console.error('FCM setup failed:', error)
+      console.warn('FCM setup failed, falling back to local notifications:', error)
       return null
     }
   }
@@ -253,16 +339,27 @@ export class PushNotificationManager {
   async initialize(): Promise<void> {
     console.log('Initializing Push Notification Manager...')
     
-    // サービスワーカー登録
-    await this.registerServiceWorker()
-    
-    // Firebase Cloud Messaging セットアップ
-    await this.setupFCM()
-    
-    // 通知クリックハンドラー設定
-    this.setupNotificationClickHandler()
-    
-    console.log('Push Notification Manager initialized')
+    try {
+      // サービスワーカー登録
+      await this.registerServiceWorker()
+      
+      // Firebase Cloud Messaging セットアップ（失敗してもOK）
+      await this.setupFCM()
+      
+      // 通知クリックハンドラー設定
+      this.setupNotificationClickHandler()
+      
+      console.log('Push Notification Manager initialized successfully')
+      
+      // FCMが利用できない場合の案内
+      if (!this.fcmToken) {
+        console.info('🔔 Local notifications are ready! FCM push notifications require VAPID key configuration.')
+      }
+      
+    } catch (error) {
+      console.error('Push Notification Manager initialization failed:', error)
+      // エラーが発生しても基本的な通知機能は使えるようにする
+    }
   }
 
   /**

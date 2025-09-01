@@ -24,6 +24,7 @@ import { db } from "@/lib/firebase"
 import { toast } from "sonner"
 import { uploadImage, validateImageFile, compressImage } from "@/lib/storage"
 import NotificationSettings from "./notification-settings"
+import { NotificationDebug } from "./notification-debug"
 
 export default function ProfileScreen() {
   const { user, userProfile, logout, refreshUserProfile, clearPWACache } = useAuth()
@@ -459,9 +460,10 @@ export default function ProfileScreen() {
 
       {/* Tabs */}
       <Tabs defaultValue="posts" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="posts">投稿</TabsTrigger>
           <TabsTrigger value="settings">設定</TabsTrigger>
+          <TabsTrigger value="debug">デバッグ</TabsTrigger>
         </TabsList>
 
         <TabsContent value="posts" className="space-y-4">
@@ -644,6 +646,10 @@ export default function ProfileScreen() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="debug" className="space-y-4">
+          <NotificationDebug />
         </TabsContent>
       </Tabs>
 
