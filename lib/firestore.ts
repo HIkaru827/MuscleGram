@@ -31,6 +31,7 @@ export const COLLECTIONS = {
   FOLLOWS: 'follows',
   LIKES: 'likes',
   PRS: 'personal_records',
+  NOTIFICATIONS: 'notifications',
 } as const
 
 // Users
@@ -695,5 +696,194 @@ export const subscribeToTimelinePosts = (callback: (posts: WorkoutPost[]) => voi
       posts.push({ id: doc.id, ...doc.data() } as WorkoutPost)
     })
     callback(posts)
+  })
+}
+
+// Notifications
+export interface NotificationData {
+  id: string
+  type: 'like' | 'comment' | 'follow' | 'achievement' | 'reminder' | 'mention'
+  title: string
+  message: string
+  timestamp: Date
+  read: boolean
+  recipientId: string
+  fromUserId?: string
+  fromUser?: User
+  relatedPostId?: string
+  actionUrl?: string
+}
+
+export const createNotification = async (notificationData: Omit<NotificationData, 'id' | 'timestamp' | 'read'>) => {
+  try {
+    const notificationsRef = collection(db, COLLECTIONS.NOTIFICATIONS)
+    const docRef = await addDoc(notificationsRef, {
+      ...notificationData,
+      timestamp: serverTimestamp(),
+      read: false
+    })
+    return docRef
+  } catch (error) {
+    console.error('Error creating notification:', error)
+    throw error
+  }
+}
+
+export const getUserNotifications = async (userId: string, limitCount = 20) => {
+  try {
+    // Use simple query to avoid index requirements - sort in memory
+    const q = query(
+      collection(db, COLLECTIONS.NOTIFICATIONS),
+      where('recipientId', '==', userId),
+      limit(limitCount)
+    )
+
+    const querySnapshot = await getDocs(q)
+    const notifications: NotificationData[] = []
+
+    for (const docSnapshot of querySnapshot.docs) {
+      const data = docSnapshot.data()
+      const notification: NotificationData = {
+        id: docSnapshot.id,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        timestamp: data.timestamp?.toDate() || new Date(),
+        read: data.read || false,
+        recipientId: data.recipientId,
+        fromUserId: data.fromUserId,
+        relatedPostId: data.relatedPostId,
+        actionUrl: data.actionUrl
+      }
+
+      // Fetch fromUser data if fromUserId exists
+      if (data.fromUserId) {
+        try {
+          const userData = await getUser(data.fromUserId)
+          notification.fromUser = userData
+        } catch (error) {
+          console.error('Error fetching user data for notification:', error)
+        }
+      }
+
+      notifications.push(notification)
+    }
+
+    // Sort by timestamp in memory instead of using orderBy
+    return notifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+  } catch (error) {
+    console.error('Error getting notifications:', error)
+    throw error
+  }
+}
+
+export const markNotificationAsRead = async (notificationId: string) => {
+  try {
+    const notificationRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId)
+    await updateDoc(notificationRef, {
+      read: true,
+      readAt: serverTimestamp()
+    })
+  } catch (error) {
+    console.error('Error marking notification as read:', error)
+    throw error
+  }
+}
+
+export const markAllNotificationsAsRead = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, COLLECTIONS.NOTIFICATIONS),
+      where('recipientId', '==', userId),
+      where('read', '==', false)
+    )
+
+    const querySnapshot = await getDocs(q)
+    const updatePromises = querySnapshot.docs.map(doc => 
+      updateDoc(doc.ref, {
+        read: true,
+        readAt: serverTimestamp()
+      })
+    )
+
+    await Promise.all(updatePromises)
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error)
+    throw error
+  }
+}
+
+export const deleteNotification = async (notificationId: string) => {
+  try {
+    const notificationRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId)
+    await deleteDoc(notificationRef)
+  } catch (error) {
+    console.error('Error deleting notification:', error)
+    throw error
+  }
+}
+
+export const getUnreadNotificationCount = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, COLLECTIONS.NOTIFICATIONS),
+      where('recipientId', '==', userId),
+      where('read', '==', false)
+    )
+
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.size
+  } catch (error) {
+    console.error('Error getting unread notification count:', error)
+    return 0
+  }
+}
+
+export const subscribeToUserNotifications = (userId: string, callback: (notifications: NotificationData[]) => void) => {
+  // Use simple query to avoid index requirements
+  const q = query(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    where('recipientId', '==', userId),
+    limit(20)
+  )
+
+  return onSnapshot(q, async (querySnapshot) => {
+    const notifications: NotificationData[] = []
+
+    for (const docSnapshot of querySnapshot.docs) {
+      const data = docSnapshot.data()
+      const notification: NotificationData = {
+        id: docSnapshot.id,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        timestamp: data.timestamp?.toDate() || new Date(),
+        read: data.read || false,
+        recipientId: data.recipientId,
+        fromUserId: data.fromUserId,
+        relatedPostId: data.relatedPostId,
+        actionUrl: data.actionUrl
+      }
+
+      // Fetch fromUser data if fromUserId exists
+      if (data.fromUserId) {
+        try {
+          const userData = await getUser(data.fromUserId)
+          notification.fromUser = userData
+        } catch (error) {
+          console.error('Error fetching user data for notification:', error)
+        }
+      }
+
+      notifications.push(notification)
+    }
+
+    // Sort by timestamp in memory instead of using orderBy
+    const sortedNotifications = notifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    callback(sortedNotifications)
+  }, (error) => {
+    console.error('Error in notification subscription:', error)
+    // On error, call callback with empty array
+    callback([])
   })
 }

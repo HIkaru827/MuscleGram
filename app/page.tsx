@@ -22,6 +22,7 @@ import LoginScreen from "@/components/auth/login-screen"
 import BrandingPage from "@/components/branding-page"
 import WorkoutIndicator from "@/components/workout-indicator"
 import MobileErrorBoundary from "@/components/mobile-error-boundary"
+import NotificationButton from "@/components/notification-button"
 
 // Memoized components to prevent unnecessary re-renders
 const MemoizedHomeScreen = React.memo(HomeScreen)
@@ -289,10 +290,14 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
         <div className="min-h-screen bg-white">
         {/* Header */}
         <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-          <div className="flex items-center justify-center h-16 px-4">
+          <div className="flex items-center justify-between h-16 px-4">
+            <div className="w-10"></div>
             <h1 className="text-2xl font-bold text-gray-900">
               Muscle<span className="text-red-500">Gram</span>
             </h1>
+            <div className="flex items-center">
+              <NotificationButton />
+            </div>
           </div>
         </header>
 

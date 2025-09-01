@@ -75,7 +75,7 @@ export default function BrandingPage({ onGetStarted }: BrandingPageProps) {
               </h2>
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
                 <span className="font-bold text-red-500">MuscleGram</span>は、AI搭載型インテリジェント筋トレコーチです。<br />
-                最先端のデータ分析、そして仲間との繋がりが、<br />
+                詳細なデータ分析、そして仲間との繋がりが、<br />
                 あなたのトレーニングを次のレベルへと引き上げます。
               </p>
               <Button 

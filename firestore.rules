@@ -60,5 +60,22 @@ service cloud.firestore {
       allow delete: if request.auth != null && 
         request.auth.uid == resource.data.userId;
     }
+    
+    // Notifications: read only by recipient, create by any authenticated user, update/delete by recipient
+    match /notifications/{notificationId} {
+      // Recipients can read their own notifications
+      allow read: if request.auth != null && 
+        request.auth.uid == resource.data.recipientId;
+      
+      // Any authenticated user can create notifications for others
+      allow create: if request.auth != null && 
+        request.resource.data.keys().hasAll(['type', 'title', 'message', 'recipientId']) &&
+        request.resource.data.recipientId is string &&
+        request.resource.data.type in ['like', 'comment', 'follow', 'achievement', 'reminder', 'mention'];
+      
+      // Recipients can update/delete their own notifications (e.g., mark as read)
+      allow update, delete: if request.auth != null && 
+        request.auth.uid == resource.data.recipientId;
+    }
   }
 }
