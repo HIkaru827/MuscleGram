@@ -19,6 +19,7 @@ import {
   subscribeToUserNotifications,
   NotificationData 
 } from "@/lib/firestore"
+import { pushNotificationManager } from "@/lib/push-notifications"
 
 export default function NotificationButton() {
   const { user } = useAuth()
@@ -26,6 +27,17 @@ export default function NotificationButton() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Update app badge when unread count changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && pushNotificationManager) {
+      if (unreadCount > 0) {
+        pushNotificationManager.setBadgeCount(unreadCount)
+      } else {
+        pushNotificationManager.clearBadge()
+      }
+    }
+  }, [unreadCount])
 
   // Load notifications from Firestore
   useEffect(() => {

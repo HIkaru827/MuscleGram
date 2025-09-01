@@ -245,13 +245,112 @@ self.addEventListener('message', (event) => {
   }
 })
 
+// プッシュ通知の受信処理
+self.addEventListener('push', (event) => {
+  console.log('Service Worker: Push notification received')
+  
+  let notificationData = {
+    title: 'MuscleGram',
+    body: '新しい通知があります',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: 'musclegram-notification',
+    data: { url: '/' },
+    actions: [
+      { action: 'open', title: '開く', icon: '/icon-192.png' },
+      { action: 'close', title: '閉じる' }
+    ]
+  }
+
+  // プッシュデータがある場合は使用する
+  if (event.data) {
+    try {
+      const data = event.data.json()
+      notificationData = {
+        ...notificationData,
+        ...data
+      }
+    } catch (error) {
+      console.error('Failed to parse push data:', error)
+      // テキストデータの場合
+      notificationData.body = event.data.text() || notificationData.body
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(notificationData.title, {
+      body: notificationData.body,
+      icon: notificationData.icon,
+      badge: notificationData.badge,
+      tag: notificationData.tag,
+      data: notificationData.data,
+      actions: notificationData.actions,
+      requireInteraction: false,
+      silent: false,
+      renotify: true,
+      vibrate: [200, 100, 200] // バイブレーション
+    })
+  )
+})
+
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close()
+  console.log('Service Worker: Notification clicked', event)
   
-  if (event.action === 'view') {
-    event.waitUntil(
-      clients.openWindow('/')
-    )
+  event.notification.close()
+
+  const action = event.action
+  const data = event.notification.data || {}
+  
+  if (action === 'close') {
+    return
   }
+
+  // 通知クリック時にアプリを開く
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // 既にアプリが開いている場合はフォーカスする
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin)) {
+            if (data.url) {
+              // 特定のページに移動
+              client.postMessage({
+                type: 'notification-click',
+                action: action,
+                data: data
+              })
+            }
+            return client.focus()
+          }
+        }
+        
+        // アプリが開いていない場合は新しいウィンドウを開く
+        const urlToOpen = data.url ? `${self.location.origin}${data.url}` : self.location.origin
+        return clients.openWindow(urlToOpen)
+      })
+  )
+})
+
+// プッシュ購読変更の処理
+self.addEventListener('pushsubscriptionchange', (event) => {
+  console.log('Service Worker: Push subscription changed')
+  
+  event.waitUntil(
+    // 新しい購読を取得して再登録
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: event.oldSubscription ? event.oldSubscription.options.applicationServerKey : null
+    }).then((subscription) => {
+      console.log('Service Worker: Push subscription renewed')
+      // サーバーに新しい購読情報を送信
+      return fetch('/api/push-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      })
+    }).catch((error) => {
+      console.error('Failed to renew push subscription:', error)
+    })
+  )
 })

@@ -3,6 +3,7 @@ import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getAnalytics } from 'firebase/analytics'
+import { getMessaging, isSupported } from 'firebase/messaging'
 
 // Firebase configuration with fallback values for build process
 const firebaseConfig = {
@@ -64,6 +65,25 @@ export const getAnalyticsInstance = () => {
     }
   }
   return analytics
+}
+
+// Initialize Messaging lazily
+let messaging: any = null
+export const getMessagingInstance = async () => {
+  if (typeof window !== 'undefined' && !messaging && app && process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key') {
+    try {
+      const messagingSupported = await isSupported()
+      if (messagingSupported) {
+        messaging = getMessaging(app)
+        console.log('Firebase Messaging initialized')
+      } else {
+        console.warn('Firebase Messaging not supported in this browser')
+      }
+    } catch (error) {
+      console.warn('Messaging initialization failed:', error)
+    }
+  }
+  return messaging
 }
 
 export default app

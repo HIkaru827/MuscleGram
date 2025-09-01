@@ -8,6 +8,7 @@ import PWAInstallPrompt from "@/components/pwa-install"
 import StructuredData from "@/components/structured-data"
 import PerformanceOptimizer from "@/components/performance-optimizer"
 import CookieConsent from "@/components/cookie-consent"
+import { NotificationInitializer } from "@/components/notification-initializer"
 import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -180,6 +181,7 @@ export default function RootLayout({
         }} />
         <AuthProvider>
           <WorkoutProvider>
+            <NotificationInitializer />
             {children}
             <PWAInstallPrompt />
             <CookieConsent />

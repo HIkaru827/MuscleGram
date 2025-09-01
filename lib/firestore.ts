@@ -22,6 +22,7 @@ import {
 import { db } from './firebase'
 import { WorkoutPost, Comment, User, Follow } from '@/types'
 import { PRRecord } from './pr-utils'
+import { pushNotificationManager, createLikeNotification, createCommentNotification, createFollowNotification } from './push-notifications'
 
 // Collections
 export const COLLECTIONS = {
@@ -209,6 +210,7 @@ export const toggleLike = async (postId: string, userId: string) => {
           const likerUser = await getUser(userId)
           
           if (likerUser) {
+            // Create database notification
             await createNotification({
               type: 'like',
               title: 'いいねされました',
@@ -218,6 +220,13 @@ export const toggleLike = async (postId: string, userId: string) => {
               relatedPostId: postId,
               actionUrl: '/home'
             })
+
+            // Trigger push notification
+            try {
+              await createLikeNotification(likerUser.displayName || 'ユーザー')
+            } catch (pushError) {
+              console.error('Error sending push notification for like:', pushError)
+            }
           }
         } catch (notificationError) {
           console.error('Error creating like notification:', notificationError)
@@ -261,6 +270,7 @@ export const createComment = async (commentData: Omit<Comment, 'id' | 'createdAt
           const commenterUser = await getUser(commentData.userId)
           
           if (commenterUser) {
+            // Create database notification
             await createNotification({
               type: 'comment',
               title: 'コメントされました',
@@ -270,6 +280,13 @@ export const createComment = async (commentData: Omit<Comment, 'id' | 'createdAt
               relatedPostId: commentData.postId,
               actionUrl: '/home'
             })
+
+            // Trigger push notification
+            try {
+              await createCommentNotification(commenterUser.displayName || 'ユーザー', commentData.text)
+            } catch (pushError) {
+              console.error('Error sending push notification for comment:', pushError)
+            }
           }
         } catch (notificationError) {
           console.error('Error creating comment notification:', notificationError)
@@ -337,6 +354,7 @@ export const followUser = async (followerId: string, followingId: string) => {
       const followerUser = await getUser(followerId)
       
       if (followerUser) {
+        // Create database notification
         await createNotification({
           type: 'follow',
           title: '新しいフォロワー',
@@ -345,6 +363,13 @@ export const followUser = async (followerId: string, followingId: string) => {
           fromUserId: followerId,
           actionUrl: '/profile'
         })
+
+        // Trigger push notification
+        try {
+          await createFollowNotification(followerUser.displayName || 'ユーザー')
+        } catch (pushError) {
+          console.error('Error sending push notification for follow:', pushError)
+        }
       }
     } catch (notificationError) {
       console.error('Error creating follow notification:', notificationError)
