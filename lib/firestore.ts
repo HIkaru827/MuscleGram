@@ -177,6 +177,7 @@ export const getPost = async (postId: string): Promise<WorkoutPost | null> => {
 
 // Likes
 export const toggleLike = async (postId: string, userId: string) => {
+  console.log('❤️ toggleLike called:', { postId, userId })
   try {
     const postRef = doc(db, COLLECTIONS.POSTS, postId)
     const postSnap = await getDoc(postRef)
@@ -187,9 +188,11 @@ export const toggleLike = async (postId: string, userId: string) => {
 
     const postData = postSnap.data() as WorkoutPost
     const isLiked = postData.likedBy?.includes(userId) || false
+    console.log('👍 Current like status:', isLiked ? 'UNLIKING' : 'LIKING')
 
     if (isLiked) {
       // Unlike
+      console.log('💔 Unliking post...')
       await updateDoc(postRef, {
         likes: increment(-1),
         likedBy: arrayRemove(userId),
@@ -197,6 +200,7 @@ export const toggleLike = async (postId: string, userId: string) => {
       })
     } else {
       // Like
+      console.log('❤️ Liking post...')
       await updateDoc(postRef, {
         likes: increment(1),
         likedBy: arrayUnion(userId),
@@ -205,12 +209,15 @@ export const toggleLike = async (postId: string, userId: string) => {
 
       // Create notification for the post owner (if not liking own post)
       if (postData.userId !== userId) {
+        console.log('🔔 Like notification process started for post:', postId)
         try {
           // Get the user who liked the post
           const likerUser = await getUser(userId)
+          console.log('👤 Liker user:', likerUser?.displayName)
           
           if (likerUser) {
             // Create database notification
+            console.log('📝 Creating database notification...')
             await createNotification({
               type: 'like',
               title: 'いいねされました',
@@ -220,12 +227,15 @@ export const toggleLike = async (postId: string, userId: string) => {
               relatedPostId: postId,
               actionUrl: '/home'
             })
+            console.log('✅ Database notification created')
 
             // Trigger push notification
+            console.log('📱 Triggering push notification...')
             try {
               await createLikeNotification(likerUser.displayName || 'ユーザー')
+              console.log('✅ Push notification sent successfully')
             } catch (pushError) {
-              console.error('Error sending push notification for like:', pushError)
+              console.error('❌ Error sending push notification for like:', pushError)
             }
           }
         } catch (notificationError) {

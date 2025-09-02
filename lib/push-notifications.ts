@@ -403,6 +403,7 @@ export const pushNotificationManager = PushNotificationManager.getInstance()
 
 // 通知タイプ別のヘルパー関数
 export const createLikeNotification = (userName: string, postPreview?: string) => {
+  console.log('📱 createLikeNotification called for user:', userName)
   return pushNotificationManager.showNotification({
     title: '新しいいいね',
     body: `${userName}さんがあなたの投稿にいいねしました`,
