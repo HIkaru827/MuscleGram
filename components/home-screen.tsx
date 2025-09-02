@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Heart, MessageCircle, Share, MoreHorizontal, Trash2 } from "lucide-react"
+import { Heart, MessageCircle, Share, MoreHorizontal, Trash2, UserPlus, UserMinus } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -11,15 +11,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/AuthContext"
 import { WorkoutPost as WorkoutPostType } from "@/types"
-import { subscribeToTimelinePosts, toggleLike, getUser, deletePost } from "@/lib/firestore"
+import { subscribeToTimelinePosts, toggleLike, getUser, deletePost, followUser, unfollowUser, isFollowing } from "@/lib/firestore"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { toast } from "sonner"
+import UserProfileScreen from "./user-profile-screen"
 
 export default function HomeScreen() {
-  const { user } = useAuth()
+  const { user, refreshUserProfile } = useAuth()
   const [posts, setPosts] = useState<WorkoutPostType[]>([])
   const [loading, setLoading] = useState(true)
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({})
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   
   console.log('HomeScreen render:', { user: user?.uid, posts: posts.length, loading })
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -27,10 +30,16 @@ export default function HomeScreen() {
   const [deleting, setDeleting] = useState(false)
 
   const handleLike = async (postId: string) => {
-    if (!user) return
+    console.log('🚨 CLICK: handleLike called for post:', postId, 'by user:', user?.uid)
+    if (!user) {
+      console.log('❌ No user logged in')
+      return
+    }
     
     try {
+      console.log('🚀 Calling toggleLike function...')
       const newIsLiked = await toggleLike(postId, user.uid)
+      console.log('✅ toggleLike completed, newIsLiked:', newIsLiked)
       setPosts(prevPosts =>
         prevPosts.map(post =>
           post.id === postId
@@ -45,7 +54,31 @@ export default function HomeScreen() {
         )
       )
     } catch (error) {
-      console.error('Error toggling like:', error)
+      console.error('❌ Error toggling like:', error)
+    }
+  }
+
+  const handleFollow = async (userId: string) => {
+    if (!user) return
+    
+    try {
+      const isCurrentlyFollowing = followingMap[userId]
+      
+      if (isCurrentlyFollowing) {
+        await unfollowUser(user.uid, userId)
+        setFollowingMap(prev => ({ ...prev, [userId]: false }))
+        toast.success("フォローを解除しました")
+      } else {
+        await followUser(user.uid, userId)
+        setFollowingMap(prev => ({ ...prev, [userId]: true }))
+        toast.success("フォローしました")
+      }
+      
+      // プロフィール情報を更新してフォロー数を反映
+      await refreshUserProfile()
+    } catch (error) {
+      console.error('Error toggling follow:', error)
+      toast.error("フォロー処理に失敗しました")
     }
   }
 
@@ -76,11 +109,21 @@ export default function HomeScreen() {
     setShowDeleteDialog(true)
   }
 
+  const handleUserClick = (userId: string) => {
+    // Don't show profile for own posts
+    if (userId === user?.uid) return
+    setViewingUserId(userId)
+  }
+
+  const handleBackToHome = () => {
+    setViewingUserId(null)
+  }
+
   useEffect(() => {
     if (!user) return
 
     const unsubscribe = subscribeToTimelinePosts(async (firestorePosts) => {
-      // Fetch user data for each post
+      // Fetch user data for each post and check follow status
       const postsWithUserData = await Promise.all(
         firestorePosts.map(async (post) => {
           if (!post.user) {
@@ -90,6 +133,20 @@ export default function HomeScreen() {
           return post
         })
       )
+      
+      // Check follow status for all unique users
+      const userIds = [...new Set(postsWithUserData.map(post => post.userId))]
+      const followStatusMap: Record<string, boolean> = {}
+      
+      await Promise.all(
+        userIds.map(async (userId) => {
+          if (userId !== user.uid) {
+            followStatusMap[userId] = await isFollowing(user.uid, userId)
+          }
+        })
+      )
+      
+      setFollowingMap(followStatusMap)
       setPosts(postsWithUserData)
       setLoading(false)
     })
@@ -113,6 +170,11 @@ export default function HomeScreen() {
     )
   }
 
+  // Show user profile if viewing a specific user
+  if (viewingUserId) {
+    return <UserProfileScreen userId={viewingUserId} onBack={handleBackToHome} />
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       {/* Posts Timeline */}
@@ -127,7 +189,10 @@ export default function HomeScreen() {
               <Card key={post.id} className="border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2 px-4 pt-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                    <div 
+                      className={`flex items-center space-x-2 ${post.userId !== user?.uid ? 'cursor-pointer hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors' : ''}`}
+                      onClick={() => handleUserClick(post.userId)}
+                    >
                       <Avatar className="w-10 h-10">
                         <AvatarImage src={post.user?.photoURL || "/placeholder.svg"} alt={post.user?.displayName || 'User'} />
                         <AvatarFallback className="bg-red-100 text-red-600 text-sm">{post.user?.displayName?.[0] || 'U'}</AvatarFallback>
@@ -140,6 +205,26 @@ export default function HomeScreen() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
+                      {post.userId !== user?.uid && (
+                        <Button
+                          variant={followingMap[post.userId] ? "secondary" : "default"}
+                          size="sm"
+                          onClick={() => handleFollow(post.userId)}
+                          className="flex items-center space-x-1 h-7"
+                        >
+                          {followingMap[post.userId] ? (
+                            <>
+                              <UserMinus className="w-3 h-3" />
+                              <span className="text-xs">フォロー中</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="w-3 h-3" />
+                              <span className="text-xs">フォロー</span>
+                            </>
+                          )}
+                        </Button>
+                      )}
                       {post.userId === user?.uid && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

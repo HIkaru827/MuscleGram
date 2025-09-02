@@ -326,6 +326,18 @@ export default function ProfileScreen() {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{userProfile.displayName || 'ユーザー'}</h1>
                   <p className="text-gray-600">{userProfile.email}</p>
+                  
+                  {/* フォロー統計 */}
+                  <div className="flex items-center space-x-6 mt-2">
+                    <div className="flex items-center space-x-1">
+                      <span className="font-semibold text-gray-900">{userProfile.following || 0}</span>
+                      <span className="text-sm text-gray-600">フォロー</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="font-semibold text-gray-900">{userProfile.followers || 0}</span>
+                      <span className="text-sm text-gray-600">フォロワー</span>
+                    </div>
+                  </div>
                 </div>
                 <Dialog open={editingProfile} onOpenChange={setEditingProfile}>
                   <DialogTrigger asChild>

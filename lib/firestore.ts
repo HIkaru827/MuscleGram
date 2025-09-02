@@ -993,3 +993,109 @@ export const subscribeToUserNotifications = (userId: string, callback: (notifica
     callback([])
   })
 }
+
+// ユーザーの統計情報を取得
+export const getUserStats = async (userId: string) => {
+  try {
+    const postsQuery = query(
+      collection(db, COLLECTIONS.POSTS),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    )
+    
+    const postsSnapshot = await getDocs(postsQuery)
+    const posts = postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WorkoutPost[]
+    
+    if (posts.length === 0) {
+      return {
+        totalWorkouts: 0,
+        totalVolume: 0,
+        averageDuration: 0,
+        popularExercises: [],
+        workoutDates: []
+      }
+    }
+    
+    let totalVolume = 0
+    let totalDuration = 0
+    let exerciseCount: Record<string, number> = {}
+    const workoutDates: string[] = []
+    
+    posts.forEach(post => {
+      // ワークアウトの日付を記録
+      if (post.createdAt) {
+        const date = post.createdAt.toDate().toISOString().split('T')[0]
+        if (!workoutDates.includes(date)) {
+          workoutDates.push(date)
+        }
+      }
+      
+      // 各エクササイズを処理
+      post.exercises?.forEach(exercise => {
+        // 人気種目をカウント
+        exerciseCount[exercise.name] = (exerciseCount[exercise.name] || 0) + 1
+        
+        // ボリューム計算 (重量 × 回数 × セット数)
+        exercise.sets?.forEach(set => {
+          totalVolume += set.weight * set.reps
+        })
+      })
+      
+      // 所要時間があれば加算
+      if (post.duration) {
+        totalDuration += post.duration
+      }
+    })
+    
+    // 人気種目をソート (使用回数順)
+    const popularExercises = Object.entries(exerciseCount)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }))
+    
+    const averageDuration = posts.length > 0 ? Math.round(totalDuration / posts.length) : 0
+    
+    return {
+      totalWorkouts: posts.length,
+      totalVolume: Math.round(totalVolume),
+      averageDuration,
+      popularExercises,
+      workoutDates: workoutDates.sort()
+    }
+  } catch (error) {
+    console.error('Error getting user stats:', error)
+    throw error
+  }
+}
+
+// 月別ワークアウト頻度を取得 (カレンダー表示用)
+export const getMonthlyWorkouts = async (userId: string, year: number, month: number) => {
+  try {
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 0, 23, 59, 59)
+    
+    const postsQuery = query(
+      collection(db, COLLECTIONS.POSTS),
+      where('userId', '==', userId),
+      where('createdAt', '>=', startDate),
+      where('createdAt', '<=', endDate),
+      orderBy('createdAt', 'desc')
+    )
+    
+    const postsSnapshot = await getDocs(postsQuery)
+    const workoutDates: Record<string, number> = {}
+    
+    postsSnapshot.docs.forEach(doc => {
+      const post = doc.data()
+      if (post.createdAt) {
+        const date = post.createdAt.toDate().getDate()
+        workoutDates[date] = (workoutDates[date] || 0) + 1
+      }
+    })
+    
+    return workoutDates
+  } catch (error) {
+    console.error('Error getting monthly workouts:', error)
+    throw error
+  }
+}
