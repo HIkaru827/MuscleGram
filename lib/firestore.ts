@@ -320,12 +320,8 @@ export const createComment = async (commentData: Omit<Comment, 'id' | 'createdAt
               actionUrl: '/home'
             })
 
-            // Trigger push notification
-            try {
-              await createCommentNotification(commenterUser.displayName || 'ユーザー', commentData.text)
-            } catch (pushError) {
-              console.error('Error sending push notification for comment:', pushError)
-            }
+            // プッシュ通知は投稿者のデバイスで処理される
+            console.log('📱 Comment push notification will be handled by the recipient device')
           }
         } catch (notificationError) {
           console.error('Error creating comment notification:', notificationError)
@@ -403,12 +399,8 @@ export const followUser = async (followerId: string, followingId: string) => {
           actionUrl: '/profile'
         })
 
-        // Trigger push notification
-        try {
-          await createFollowNotification(followerUser.displayName || 'ユーザー')
-        } catch (pushError) {
-          console.error('Error sending push notification for follow:', pushError)
-        }
+        // プッシュ通知はフォローされた人のデバイスで処理される
+        console.log('📱 Follow push notification will be handled by the recipient device')
       }
     } catch (notificationError) {
       console.error('Error creating follow notification:', notificationError)
