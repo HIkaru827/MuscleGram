@@ -148,6 +148,7 @@ const defaultMuscleGroups: MuscleGroup[] = [
 ]
 
 export default function RecordScreen() {
+  // Fixed JSX syntax error by adding missing closing brace
   const { user } = useAuth()
   const { startWorkoutTimer, setTimer } = usePWA()
   const {
@@ -669,9 +670,6 @@ export default function RecordScreen() {
     }
   }
 
-  // Debug: Add console.log to help locate the issue
-  console.log('About to check isWorkoutActive:', isWorkoutActive)
-
   if (isWorkoutActive) {
     return (
       <div className="max-w-2xl mx-auto p-4 pb-24">
@@ -1037,15 +1035,17 @@ export default function RecordScreen() {
               </div>
 
               {/* RPE公開設定 */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="rpe-public" className="text-sm">
-                  RPEを公開する
-                </Label>
-                <Switch
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
                   id="rpe-public"
                   checked={rpePublic}
-                  onCheckedChange={setRpePublic}
+                  onChange={(e) => setRpePublic(e.target.checked)}
+                  className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                 />
+                <Label htmlFor="rpe-public" className="text-sm text-gray-700 cursor-pointer">
+                  このRPE（運動強度）を公開する
+                </Label>
               </div>
             </div>
 

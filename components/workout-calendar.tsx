@@ -19,7 +19,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [workoutDates, setWorkoutDates] = useState<Record<string, number>>({})
+  const [workoutDates, setWorkoutDates] = useState<Record<string, { count: number; maxRpe: number }>>({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -79,11 +79,13 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
     })
   }
 
-  const getWorkoutIntensity = (workoutCount: number) => {
-    if (workoutCount === 0) return 'bg-gray-100'
-    if (workoutCount === 1) return 'bg-green-200'
-    if (workoutCount === 2) return 'bg-green-400'
-    return 'bg-green-600'
+  const getRpeIntensity = (maxRpe: number) => {
+    if (maxRpe === 0) return 'bg-gray-100'
+    if (maxRpe >= 1 && maxRpe <= 3) return 'bg-red-200'
+    if (maxRpe >= 4 && maxRpe <= 6) return 'bg-red-400'
+    if (maxRpe >= 7 && maxRpe <= 8) return 'bg-red-500'
+    if (maxRpe >= 9 && maxRpe <= 10) return 'bg-red-600'
+    return 'bg-gray-100'
   }
 
   const days = getDaysInMonth()
@@ -133,7 +135,9 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
               {days.map((day, index) => {
-                const workoutCount = day ? workoutDates[day] || 0 : 0
+                const workoutData = day ? workoutDates[day] : null
+                const workoutCount = workoutData?.count || 0
+                const maxRpe = workoutData?.maxRpe || 0
                 const isToday = day && 
                   new Date().getFullYear() === year &&
                   new Date().getMonth() === month &&
@@ -145,19 +149,19 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
                     className={`
                       aspect-square flex items-center justify-center text-sm rounded-md
                       ${day ? 'cursor-pointer hover:ring-2 hover:ring-gray-300' : ''}
-                      ${day ? getWorkoutIntensity(workoutCount) : ''}
+                      ${day ? getRpeIntensity(maxRpe) : ''}
                       ${isToday ? 'ring-2 ring-blue-500' : ''}
                     `}
-                    title={day && workoutCount > 0 ? `${workoutCount}回のワークアウト` : ''}
+                    title={day && workoutCount > 0 ? `${workoutCount}回のワークアウト${maxRpe > 0 ? `（最高RPE: ${maxRpe}）` : ''}` : ''}
                   >
                     {day && (
                       <div className="flex flex-col items-center">
-                        <span className={`font-medium ${workoutCount > 2 ? 'text-white' : 'text-gray-700'}`}>
+                        <span className={`font-medium ${maxRpe >= 9 ? 'text-white' : 'text-gray-700'}`}>
                           {day}
                         </span>
                         {workoutCount > 0 && (
-                          <div className={`text-xs ${workoutCount > 2 ? 'text-white' : 'text-gray-600'}`}>
-                            {workoutCount}
+                          <div className={`text-xs ${maxRpe >= 9 ? 'text-white' : 'text-gray-600'}`}>
+                            {maxRpe > 0 ? `RPE${maxRpe}` : `${workoutCount}回`}
                           </div>
                         )}
                       </div>
@@ -168,22 +172,26 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
             </div>
             
             {/* Legend */}
-            <div className="flex items-center justify-center space-x-4 mt-4 text-sm text-gray-600">
+            <div className="flex items-center justify-center space-x-3 mt-4 text-sm text-gray-600">
               <div className="flex items-center space-x-1">
                 <div className="w-3 h-3 bg-gray-100 rounded"></div>
-                <span>0回</span>
+                <span>RPE なし</span>
               </div>
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 bg-green-200 rounded"></div>
-                <span>1回</span>
+                <div className="w-3 h-3 bg-red-200 rounded"></div>
+                <span>RPE 1-3</span>
               </div>
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 bg-green-400 rounded"></div>
-                <span>2回</span>
+                <div className="w-3 h-3 bg-red-400 rounded"></div>
+                <span>RPE 4-6</span>
               </div>
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 bg-green-600 rounded"></div>
-                <span>3回+</span>
+                <div className="w-3 h-3 bg-red-500 rounded"></div>
+                <span>RPE 7-8</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <div className="w-3 h-3 bg-red-600 rounded"></div>
+                <span>RPE 9-10</span>
               </div>
             </div>
           </>

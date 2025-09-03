@@ -1113,13 +1113,22 @@ export const getMonthlyWorkouts = async (userId: string, year: number, month: nu
     )
     
     const postsSnapshot = await getDocs(postsQuery)
-    const workoutDates: Record<string, number> = {}
+    const workoutDates: Record<string, { count: number; maxRpe: number }> = {}
     
     postsSnapshot.docs.forEach(doc => {
       const post = doc.data()
       if (post.createdAt) {
         const date = post.createdAt.toDate().getDate()
-        workoutDates[date] = (workoutDates[date] || 0) + 1
+        const rpe = post.rpe || 0
+        
+        if (!workoutDates[date]) {
+          workoutDates[date] = { count: 0, maxRpe: 0 }
+        }
+        
+        workoutDates[date].count += 1
+        if (rpe > workoutDates[date].maxRpe) {
+          workoutDates[date].maxRpe = rpe
+        }
       }
     })
     
