@@ -208,6 +208,12 @@ export const toggleLike = async (postId: string, userId: string) => {
       })
 
       // Create notification for the post owner (if not liking own post)
+      console.log('🔍 Checking notification conditions:', {
+        postUserId: postData.userId,
+        likerUserId: userId,
+        shouldCreateNotification: postData.userId !== userId,
+        postData: postData
+      })
       if (postData.userId !== userId) {
         console.log('🔔 Like notification process started for post:', postId)
         try {
