@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import { useWorkout } from "@/contexts/WorkoutContext"
-import { createPost, savePR, getLatestPRForExercise } from "@/lib/firestore"
+import { createPost, savePR, getLatestPRForExercise, getWorkoutsByDate, updatePost } from "@/lib/firestore"
 import { uploadMultipleImages, validateImageFile, compressImage } from "@/lib/storage"
 import { toast } from "sonner"
 import { usePWA } from "@/hooks/usePWA"
@@ -161,7 +161,9 @@ export default function RecordScreen() {
     addExerciseToWorkout,
     updateSet,
     addSet,
-    removeSet
+    removeSet,
+    setCurrentWorkout,
+    setWorkoutStartTime
   } = useWorkout()
   const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
@@ -189,6 +191,7 @@ export default function RecordScreen() {
   const [recordDate, setRecordDate] = useState<string>('')
   const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState<number>(0)
   const [selectedCalendarMonth, setSelectedCalendarMonth] = useState<Date>(new Date())
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null)
 
   // 初期化：デフォルトでライブ記録モードに設定
   useEffect(() => {
@@ -336,7 +339,9 @@ export default function RecordScreen() {
   }
 
   // カレンダー日付クリック時のナビゲーション処理
-  const handleCalendarNavigation = (clickedDate: Date, isToday: boolean) => {
+  const handleCalendarNavigation = async (clickedDate: Date, isToday: boolean) => {
+    if (!user) return
+    
     // ローカルタイムゾーンを考慮した日付文字列を生成
     const dateStr = format(clickedDate, 'yyyy-MM-dd')
     
@@ -355,22 +360,184 @@ export default function RecordScreen() {
       setRecordMode('live')
       setRecordDate('')
       setManualTimeInput({ startTime: '', endTime: '' })
+      // 新しいワークアウトなのでcurrentWorkoutをクリア
+      setCurrentWorkout([])
+      setEditingWorkoutId(null)
     } else {
       // 過去の日付をクリックした場合は手動記録モード
       setRecordMode('manual')
       setRecordDate(dateStr)
       
-      // 現在の時刻を初期値として設定
-      const now = new Date()
-      const currentTime = now.toTimeString().slice(0, 5) // HH:MM形式
-      setManualTimeInput({
-        startTime: currentTime,
-        endTime: currentTime
-      })
-      
-      // 手動記録モードの場合は即座にワークアウトを開始
-      if (!isWorkoutActive) {
-        startWorkoutContext()
+      try {
+        // その日のワークアウトデータを取得
+        const existingWorkouts = await getWorkoutsByDate(user.uid, dateStr)
+        
+        console.log('🔍 Raw workout data retrieved:', {
+          dateStr,
+          workoutsFound: existingWorkouts.length,
+          firstWorkout: existingWorkouts[0] ? {
+            id: existingWorkouts[0].id,
+            exercisesCount: existingWorkouts[0].exercises?.length || 0,
+            exercises: existingWorkouts[0].exercises?.map((e: any) => ({
+              name: e.name,
+              setsCount: e.sets?.length || 0
+            })) || []
+          } : null
+        })
+        
+        let workoutEntries: any[] = []
+        
+        if (existingWorkouts.length > 0) {
+          // 最初のワークアウト（最新）を編集用に読み込む
+          const workoutData = existingWorkouts[0]
+          
+          // WorkoutEntry形式に変換してcurrentWorkoutに設定
+          workoutEntries = workoutData.exercises.map((exercise: any, index: number) => {
+            // setsが配列でない場合やundefinedの場合のデフォルト処理
+            const sets = Array.isArray(exercise.sets) ? exercise.sets : []
+            
+            // 各セットのデータを検証・修正（オリジナル既存記録としてマーク）
+            const validatedSets = sets.map((set: any) => ({
+              weight: typeof set.weight === 'number' ? set.weight : 0,
+              reps: typeof set.reps === 'number' ? set.reps : 0,
+              restTime: set.restTime || undefined,
+              isOriginalExisting: true // 既存記録から読み込まれたセット
+            }))
+            
+            return {
+              id: `${workoutData.id}_exercise_${index}_${Date.now()}`, // より一意なID
+              exerciseId: exercise.id || exercise.exerciseId || `exercise_${index}_${Date.now()}`,
+              exerciseName: exercise.name || '不明なエクササイズ',
+              sets: validatedSets
+            }
+          })
+          
+          console.log('Loading existing workout data:', {
+            workoutId: workoutData.id,
+            exerciseCount: workoutEntries.length,
+            exercises: workoutEntries.map(e => ({ 
+              name: e.exerciseName, 
+              setsCount: e.sets.length,
+              setsData: e.sets 
+            }))
+          })
+          
+          // 確実にワークアウトデータを設定
+          console.log('🔄 Setting workout entries:', workoutEntries)
+          console.log('🔄 Current workout before setting:', currentWorkout)
+          
+          // 直接的なアプローチで状態を設定
+          setCurrentWorkout([])  // まず空にしてから
+          setTimeout(() => {
+            setCurrentWorkout(workoutEntries)  // 設定
+            console.log('🔄 setCurrentWorkout called with:', workoutEntries.length, 'entries')
+          }, 50)
+          
+          // 編集中のワークアウトIDを設定
+          setEditingWorkoutId(workoutData.id)
+          
+          console.log('✅ Workout data loaded successfully:', {
+            currentWorkoutLength: workoutEntries.length,
+            editingWorkoutId: workoutData.id,
+            isWorkoutActive: isWorkoutActive,
+            firstExercise: workoutEntries[0]?.exerciseName,
+            firstExerciseSets: workoutEntries[0]?.sets?.length
+          })
+          
+          // 少し待ってから状態確認
+          setTimeout(() => {
+            console.log('🎯 Current workout state check:', {
+              currentWorkoutLength: currentWorkout.length,
+              isWorkoutActive,
+              editingWorkoutId
+            })
+          }, 50)
+          
+          // 既存のコメント、写真、RPE情報も復元
+          if (workoutData.comment) setPostComment(workoutData.comment)
+          if (workoutData.photos) setSelectedPhotos(workoutData.photos)
+          if (workoutData.rpe) setRpe(workoutData.rpe)
+          if (workoutData.rpePublic !== undefined) setRpePublic(workoutData.rpePublic)
+          
+          // 時間情報も復元（投稿データから推定）
+          if (workoutData.createdAt) {
+            const postDate = workoutData.createdAt.toDate()
+            const startTime = new Date(postDate.getTime() - (workoutData.duration || 60) * 60000)
+            const endTime = postDate
+            
+            setManualTimeInput({
+              startTime: startTime.toTimeString().slice(0, 5),
+              endTime: endTime.toTimeString().slice(0, 5)
+            })
+          }
+          
+          const loadedExercises = workoutEntries.map(e => e.exerciseName).join(', ')
+          const totalSets = workoutEntries.reduce((sum, e) => sum + e.sets.length, 0)
+          toast.success(`${dateStr}の記録を編集モードで開始: ${loadedExercises} (${totalSets}セット)`, {
+            duration: 5000
+          })
+        } else {
+          // その日にワークアウトがない場合は新規作成
+          setCurrentWorkout([])
+          setEditingWorkoutId(null)
+          setPostComment('')
+          setSelectedPhotos([])
+          setRpe(5)
+          setRpePublic(false)
+          
+          // 現在の時刻を初期値として設定
+          const now = new Date()
+          const currentTime = now.toTimeString().slice(0, 5)
+          setManualTimeInput({
+            startTime: currentTime,
+            endTime: currentTime
+          })
+          
+          toast.info(`${dateStr}の新しいワークアウトを作成`)
+        }
+        
+        // ワークアウトを開始状態にする（確実に実行）
+        console.log('🚀 Starting workout context:', {
+          wasActive: isWorkoutActive,
+          workoutEntriesCount: workoutEntries?.length || 0
+        })
+        
+        // 編集モードの場合は必ずワークアウトを開始
+        if (!isWorkoutActive || editingWorkoutId) {
+          startWorkoutContext()
+        }
+        setWorkoutStartTime(Date.now())
+        
+        // 状態の同期を確認するための短いディレイ
+        setTimeout(() => {
+          console.log('🔍 Workout state after loading:', {
+            isWorkoutActive,
+            currentWorkoutLength: currentWorkout.length,
+            editingWorkoutId,
+            recordMode,
+            recordDate,
+            currentWorkoutFirstExercise: currentWorkout[0]?.exerciseName,
+            workoutEntriesLength: workoutEntries?.length || 0
+          })
+        }, 200)
+        
+      } catch (error) {
+        console.error('Error loading workout data:', error)
+        toast.error('ワークアウトデータの読み込みに失敗しました')
+        
+        // エラーの場合は新規作成
+        setCurrentWorkout([])
+        const now = new Date()
+        const currentTime = now.toTimeString().slice(0, 5)
+        setManualTimeInput({
+          startTime: currentTime,
+          endTime: currentTime
+        })
+        
+        // 手動記録モードの場合は即座にワークアウトを開始
+        if (!isWorkoutActive) {
+          startWorkoutContext()
+        }
       }
     }
   }
@@ -575,19 +742,29 @@ export default function RecordScreen() {
         exercises: currentWorkout.map(entry => ({
           id: entry.exerciseId,
           name: entry.exerciseName,
-          sets: entry.sets
+          sets: entry.sets.map(set => {
+            // Remove undefined values and keep only Firebase-compatible fields
+            const cleanSet: any = {
+              weight: set.weight || 0,
+              reps: set.reps || 0
+            }
+            if (set.restTime !== undefined) {
+              cleanSet.restTime = set.restTime
+            }
+            return cleanSet
+          })
         })),
-        comment: postComment,
-        photos: photoUrls,
-        duration,
+        comment: postComment || '',
+        photos: photoUrls || [],
+        duration: duration || 0,
         likes: 0,
         likedBy: [],
         comments: 0,
         isPublic: true,
-        rpe: rpe, // RPE値を追加
-        rpePublic: rpePublic, // RPE公開設定を追加
+        rpe: rpe || 0, // RPE値を追加
+        rpePublic: rpePublic || false, // RPE公開設定を追加
         createdAt: postDate, // 手動記録の場合は指定した日付を設定
-        recordMode: recordMode, // 記録モードも保存
+        recordMode: recordMode || 'live', // 記録モードも保存
         recordDate: recordDate || format(new Date(), 'yyyy-MM-dd') // 記録対象日
       }
 
@@ -596,15 +773,26 @@ export default function RecordScreen() {
         recordDate,
         createdAt: postData.createdAt,
         createdAtDate: postData.createdAt.toDate(),
-        localDateString: format(postData.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss')
+        localDateString: format(postData.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
+        isEditing: !!editingWorkoutId
       })
       
-      const postRef = await createPost(postData)
+      let postRef
+      if (editingWorkoutId) {
+        // 編集モードの場合は既存の投稿を更新
+        postRef = await updatePost(editingWorkoutId, postData)
+        toast.success("ワークアウト記録を更新しました！")
+      } else {
+        // 新規投稿の場合は新しく作成
+        postRef = await createPost(postData)
+        toast.success("ワークアウトを投稿しました！")
+      }
       
       // Save PRs to Firestore
+      const workoutId = editingWorkoutId || postRef.id
       await Promise.all(
         calculatedPRs.map(pr => 
-          savePR({ ...pr, workoutId: postRef.id })
+          savePR({ ...pr, workoutId })
         )
       )
       
@@ -632,9 +820,11 @@ export default function RecordScreen() {
         setTimeout(() => {
           setShowPRRecommendation(true)
         }, 3000)
-        toast.success(`ワークアウトを投稿しました！${calculatedPRs.length}件のPR達成！`)
-      } else {
-        toast.success("ワークアウトを投稿しました！")
+        if (editingWorkoutId) {
+          toast.success(`記録を更新しました！${calculatedPRs.length}件のPR達成！`)
+        } else {
+          toast.success(`ワークアウトを投稿しました！${calculatedPRs.length}件のPR達成！`)
+        }
       }
       
       // Reset state and mode
@@ -661,6 +851,9 @@ export default function RecordScreen() {
         setManualTimeInput({ startTime: '', endTime: '' })
         // 注意：selectedCalendarMonth は維持する（月を保持）
       }
+      
+      // 編集モードをリセット
+      setEditingWorkoutId(null)
 
     } catch (error) {
       console.error('Error posting workout:', error)
@@ -763,27 +956,82 @@ export default function RecordScreen() {
         </div>
 
         <div className="space-y-4">
+          {editingWorkoutId && currentWorkout.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-blue-700 font-medium text-sm">📝 既存の記録を編集中</span>
+                <span className="text-blue-600 text-sm">({currentWorkout.length}種目)</span>
+              </div>
+              <div className="text-xs text-blue-600">
+                記録日: {recordDate} | 編集ID: {editingWorkoutId.slice(-8)}
+              </div>
+            </div>
+          )}
+          
+          {recordMode === 'manual' && !editingWorkoutId && currentWorkout.length === 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-yellow-700 font-medium text-sm">📅 {recordDate}の新規記録</span>
+              </div>
+            </div>
+          )}
+          
+          {currentWorkout.length === 0 && isWorkoutActive && (
+            <div className="text-center py-8 text-gray-500">
+              <p>
+                {editingWorkoutId 
+                  ? "記録を読み込み中..." 
+                  : "エクササイズを追加してワークアウトを開始しましょう"
+                }
+              </p>
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs mt-2 text-gray-400">
+                  Debug: isWorkoutActive={isWorkoutActive.toString()}, editingWorkoutId={editingWorkoutId || 'null'}, currentWorkout.length={currentWorkout.length}
+                </div>
+              )}
+            </div>
+          )}
+          
           {currentWorkout.map((entry, index) => (
-            <Card key={entry.exerciseId} className="border border-gray-200">
+            <Card key={entry.exerciseId} className={`border ${editingWorkoutId ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200'}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900">{entry.exerciseName}</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addSet(entry.exerciseId)}
-                  >
-                    セット追加
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-semibold text-gray-900">{entry.exerciseName}</h3>
+                    {editingWorkoutId && entry.sets.some(set => set.isOriginalExisting) && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                        既存記録
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {entry.sets.length > 0 && (
+                      <span className="text-xs text-gray-500">
+                        {entry.sets.length}セット
+                      </span>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addSet(entry.exerciseId)}
+                    >
+                      セット追加
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
                   {entry.sets.map((set, setIndex) => {
                     const e1rm = calculateE1RM(set.weight, set.reps)
                     return (
-                      <div key={setIndex} className="flex flex-col sm:flex-row gap-2 p-2 bg-gray-50 rounded-lg">
+                      <div key={setIndex} className={`flex flex-col sm:flex-row gap-2 p-2 rounded-lg ${editingWorkoutId ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50'}`}>
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
-                          <span className="w-8 text-sm text-gray-500 shrink-0">#{setIndex + 1}</span>
+                          <div className="flex items-center space-x-1">
+                            <span className="w-8 text-sm text-gray-500 shrink-0">#{setIndex + 1}</span>
+                            {editingWorkoutId && set.isOriginalExisting && (
+                              <span className="text-xs text-blue-600 bg-blue-100 px-1 py-0.5 rounded">既存記録</span>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-1">
                             <Input
                               type="number"
@@ -1097,6 +1345,11 @@ export default function RecordScreen() {
               {recordMode === 'manual' && (
                 <Badge variant="secondary" className="text-xs">
                   📝 手動記録
+                </Badge>
+              )}
+              {editingWorkoutId && (
+                <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                  ✏️ 編集モード
                 </Badge>
               )}
               {recordMode === 'manual' && recordDate && (

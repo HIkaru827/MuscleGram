@@ -18,6 +18,7 @@ import {
   onSnapshot,
   QuerySnapshot,
   DocumentSnapshot,
+  Timestamp,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { WorkoutPost, Comment, User, Follow } from '@/types'
@@ -1135,6 +1136,53 @@ export const getMonthlyWorkouts = async (userId: string, year: number, month: nu
     return workoutDates
   } catch (error) {
     console.error('Error getting monthly workouts:', error)
+    throw error
+  }
+}
+
+// 特定の日付のワークアウト投稿を取得 (編集用)
+export const getWorkoutsByDate = async (userId: string, date: string) => {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+  
+  try {
+    // 指定日の開始と終了を設定
+    const startDate = new Date(date + 'T00:00:00')
+    const endDate = new Date(date + 'T23:59:59')
+    
+    const postsQuery = query(
+      collection(db, COLLECTIONS.POSTS),
+      where('userId', '==', userId),
+      where('createdAt', '>=', startDate),
+      where('createdAt', '<=', endDate),
+      orderBy('createdAt', 'desc')
+    )
+    
+    const postsSnapshot = await getDocs(postsQuery)
+    const workouts = postsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+    
+    return workouts
+  } catch (error) {
+    console.error('Error getting workouts by date:', error)
+    throw error
+  }
+}
+
+// 既存のワークアウト投稿を更新
+export const updatePost = async (postId: string, postData: any) => {
+  try {
+    const postRef = doc(db, COLLECTIONS.POSTS, postId)
+    await updateDoc(postRef, {
+      ...postData,
+      updatedAt: Timestamp.fromDate(new Date())
+    })
+    return postRef
+  } catch (error) {
+    console.error('Error updating post:', error)
     throw error
   }
 }

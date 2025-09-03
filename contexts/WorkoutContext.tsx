@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 interface WorkoutSet {
   weight: number
   reps: number
+  isOriginalExisting?: boolean
 }
 
 interface WorkoutEntry {
@@ -24,6 +25,8 @@ interface WorkoutContextType {
   updateSet: (exerciseId: string, setIndex: number, field: 'weight' | 'reps', value: number) => void
   addSet: (exerciseId: string) => void
   removeSet: (exerciseId: string, setIndex: number) => void
+  setCurrentWorkout: (workout: WorkoutEntry[]) => void
+  setWorkoutStartTime: (time: number | Date) => void
 }
 
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined)
@@ -116,7 +119,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       const newEntry: WorkoutEntry = {
         exerciseId,
         exerciseName,
-        sets: [{ weight: lastPerformed?.weight || 0, reps: lastPerformed?.reps || 0 }]
+        sets: [{ weight: lastPerformed?.weight || 0, reps: lastPerformed?.reps || 0, isOriginalExisting: false }]
       }
       setCurrentWorkout(prev => [...prev, newEntry])
     }
@@ -143,7 +146,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
         entry.exerciseId === exerciseId
           ? {
               ...entry,
-              sets: [...entry.sets, { weight: entry.sets[entry.sets.length - 1]?.weight || 0, reps: entry.sets[entry.sets.length - 1]?.reps || 0 }]
+              sets: [...entry.sets, { weight: entry.sets[entry.sets.length - 1]?.weight || 0, reps: entry.sets[entry.sets.length - 1]?.reps || 0, isOriginalExisting: false }]
             }
           : entry
       )
@@ -163,6 +166,11 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  const handleSetWorkoutStartTime = (time: number | Date) => {
+    const startTime = time instanceof Date ? time : new Date(time)
+    setWorkoutStartTime(startTime)
+  }
+
   return (
     <WorkoutContext.Provider value={{
       isWorkoutActive,
@@ -174,7 +182,9 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       addExerciseToWorkout,
       updateSet,
       addSet,
-      removeSet
+      removeSet,
+      setCurrentWorkout: setCurrentWorkout,
+      setWorkoutStartTime: handleSetWorkoutStartTime
     }}>
       {children}
     </WorkoutContext.Provider>
