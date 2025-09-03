@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import { useWorkout } from "@/contexts/WorkoutContext"
@@ -170,6 +172,8 @@ export default function RecordScreen() {
   const [postComment, setPostComment] = useState("")
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([])
   const [posting, setPosting] = useState(false)
+  const [rpe, setRpe] = useState<number>(5) // RPE初期値を5に設定
+  const [rpePublic, setRpePublic] = useState<boolean>(false) // デフォルトは非公開
   const [showTimerDialog, setShowTimerDialog] = useState(false)
   const [newPRs, setNewPRs] = useState<PRRecord[]>([])
   const [showPRCelebration, setShowPRCelebration] = useState(false)
@@ -579,6 +583,8 @@ export default function RecordScreen() {
         likedBy: [],
         comments: 0,
         isPublic: true,
+        rpe: rpe, // RPE値を追加
+        rpePublic: rpePublic, // RPE公開設定を追加
         createdAt: postDate, // 手動記録の場合は指定した日付を設定
         recordMode: recordMode, // 記録モードも保存
         recordDate: recordDate || format(new Date(), 'yyyy-MM-dd') // 記録対象日
@@ -636,6 +642,8 @@ export default function RecordScreen() {
       setShowTimerDialog(false)
       setPostComment("")
       setSelectedPhotos([])
+      setRpe(5) // RPEを初期値に戻す
+      setRpePublic(false) // RPE公開設定をリセット
       
       // Force reset timer dialog state - ensure it's truly closed
       setTimeout(() => {
@@ -661,8 +669,10 @@ export default function RecordScreen() {
     }
   }
 
-  if (isWorkoutActive) {
+  // Debug: Add console.log to help locate the issue
+  console.log('About to check isWorkoutActive:', isWorkoutActive)
 
+  if (isWorkoutActive) {
     return (
       <div className="max-w-2xl mx-auto p-4 pb-24">
         {/* ヘッダー部分 */}
@@ -1000,7 +1010,46 @@ export default function RecordScreen() {
                 )}
               </div>
 
-              <div className="flex space-x-2">
+              {/* RPE入力欄 */}
+              <div>
+                <Label htmlFor="rpe">今日のワークアウトのキツさはどれくらいでしたか？（RPE）</Label>
+                <div className="mt-2 space-y-3">
+                  <div className="grid grid-cols-5 gap-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => (
+                      <Button
+                        key={value}
+                        type="button"
+                        variant={rpe === value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setRpe(value)}
+                        className={`h-10 ${rpe === value ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300'}`}
+                      >
+                        {value}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>1-3: とても楽</span>
+                    <span className="font-semibold text-gray-900">RPE: {rpe}</span>
+                    <span>8-10: 限界</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* RPE公開設定 */}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rpe-public" className="text-sm">
+                  RPEを公開する
+                </Label>
+                <Switch
+                  id="rpe-public"
+                  checked={rpePublic}
+                  onCheckedChange={setRpePublic}
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => setShowPostDialog(false)}
@@ -1024,7 +1073,6 @@ export default function RecordScreen() {
                   )}
                 </Button>
               </div>
-            </div>
           </DialogContent>
         </Dialog>
       </div>

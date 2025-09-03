@@ -33,7 +33,15 @@ service cloud.firestore {
     match /workout_posts/{postId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.userId;
+        request.auth.uid == request.resource.data.userId &&
+        // Validate required fields
+        request.resource.data.keys().hasAll(['userId', 'exercises', 'comment', 'duration', 'likes', 'likedBy', 'comments', 'isPublic', 'createdAt']) &&
+        // Allow optional fields including RPE
+        request.resource.data.keys().hasOnly(['userId', 'exercises', 'comment', 'photos', 'duration', 'likes', 'likedBy', 'comments', 'isPublic', 'createdAt', 'updatedAt', 'recordMode', 'recordDate', 'rpe', 'rpePublic']) &&
+        // Validate RPE if present
+        (!('rpe' in request.resource.data) || (request.resource.data.rpe is number && request.resource.data.rpe >= 1 && request.resource.data.rpe <= 10)) &&
+        // Validate rpePublic if present
+        (!('rpePublic' in request.resource.data) || request.resource.data.rpePublic is bool);
       allow delete: if request.auth != null && 
         request.auth.uid == resource.data.userId;
       // Allow owner to update all fields
@@ -47,7 +55,11 @@ service cloud.firestore {
     
     // Personal records: read and write only by owner
     match /personal_records/{recordId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+      allow update, delete: if request.auth != null && 
         request.auth.uid == resource.data.userId;
     }
     

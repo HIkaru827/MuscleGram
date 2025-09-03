@@ -311,6 +311,21 @@ export default function HomeScreen() {
                     </div>
                   )}
 
+                  {/* RPE Display */}
+                  {post.rpe && post.rpePublic && (
+                    <div className="mb-2 flex items-center space-x-2">
+                      <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                        RPE: {post.rpe}/10
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        {post.rpe <= 3 && "とても楽"}
+                        {post.rpe >= 4 && post.rpe <= 6 && "普通"}
+                        {post.rpe >= 7 && post.rpe <= 8 && "きつい"}
+                        {post.rpe >= 9 && "限界"}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                     <div className="flex items-center space-x-4">

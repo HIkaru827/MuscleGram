@@ -39,6 +39,8 @@ export interface WorkoutPost {
   likedBy: string[]
   comments: number
   isPublic: boolean
+  rpe?: number // RPE (Rate of Perceived Exertion) 1-10
+  rpePublic?: boolean // RPE公開設定
   createdAt: Timestamp
   updatedAt: Timestamp
 }
