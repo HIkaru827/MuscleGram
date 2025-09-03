@@ -138,11 +138,13 @@ export class PushNotificationManager {
     console.log('✅ Notification permission granted, proceeding with notification')
 
     try {
-      // Force direct browser notification for testing on localhost
+      // Check if we should force Service Worker notifications for background testing
+      const forceServiceWorker = localStorage.getItem('force-sw-notifications') === 'true'
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
       
-      if (isLocalhost) {
+      if (isLocalhost && !forceServiceWorker) {
         console.log('🔧 Development mode: Using direct browser notification (localhost bypass)')
+        console.log('💡 To test Service Worker notifications, run: localStorage.setItem("force-sw-notifications", "true")')
         this.createDirectNotification(options)
         return
       }
@@ -415,6 +417,45 @@ export class PushNotificationManager {
    */
   isSupported(): boolean {
     return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window
+  }
+
+  /**
+   * Service Worker経由でバックグラウンド通知をテスト
+   */
+  async testBackgroundNotification(): Promise<void> {
+    console.log('🧪 Testing background notification via Service Worker...')
+    
+    if (!this.registration || !this.registration.active) {
+      throw new Error('Service Worker not available for background notification test')
+    }
+
+    try {
+      const testOptions = {
+        body: 'これはバックグラウンド通知のテストです',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'test-background-notification',
+        data: { type: 'test' },
+        requireInteraction: false,
+        silent: false,
+        timestamp: Date.now(),
+        vibrate: [200, 100, 200],
+        actions: [
+          { action: 'test', title: 'テスト', icon: '/icon-192.png' }
+        ]
+      }
+
+      await this.registration.showNotification('🧪 バックグラウンド通知テスト', testOptions)
+      console.log('✅ Background notification test sent successfully')
+      
+      // Verify notification was created
+      const notifications = await this.registration.getNotifications()
+      console.log('📊 Active notifications after test:', notifications.length)
+      
+    } catch (error) {
+      console.error('❌ Background notification test failed:', error)
+      throw error
+    }
   }
 }
 

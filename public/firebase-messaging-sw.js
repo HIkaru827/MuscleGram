@@ -2,15 +2,14 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-// Initialize Firebase in the service worker
-// Note: These values should be replaced with your actual Firebase configuration
+// Initialize Firebase in the service worker with actual configuration
 const firebaseConfig = {
-  apiKey: "demo-api-key", // Replace with your actual API key
-  authDomain: "demo.firebaseapp.com", // Replace with your actual auth domain
-  projectId: "demo-project", // Replace with your actual project ID
-  storageBucket: "demo-project.appspot.com", // Replace with your actual storage bucket
-  messagingSenderId: "123456789", // Replace with your actual messaging sender ID
-  appId: "1:123456789:web:demo", // Replace with your actual app ID
+  apiKey: "AIzaSyBG6naSYYWQGzduHSMmI6yCTM_g6H4Qtio",
+  authDomain: "musclegram-d5b32.firebaseapp.com",
+  projectId: "musclegram-d5b32",
+  storageBucket: "musclegram-d5b32.firebasestorage.app",
+  messagingSenderId: "111971918599",
+  appId: "1:111971918599:web:7340e8d15b470ff581dba2"
 };
 
 firebase.initializeApp(firebaseConfig);
