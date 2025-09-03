@@ -1132,6 +1132,7 @@ export default function RecordScreen() {
           習慣の可視化とモチベーション強化のために、あなたのワークアウト履歴をカレンダーで確認しましょう。
         </div>
         <WorkoutCalendar 
+          userId={user?.uid}
           onNavigateToRecord={handleCalendarNavigation}
           refreshTrigger={calendarRefreshTrigger}
           selectedMonth={selectedCalendarMonth}

@@ -1,13 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getMonthlyWorkouts } from "@/lib/firestore"
 
 interface WorkoutCalendarProps {
-  userId: string
+  userId?: string
+  onNavigateToRecord?: (date: Date, isToday: boolean) => void
+  refreshTrigger?: number
+  selectedMonth?: Date
+  onMonthChange?: (date: Date) => void
 }
 
 const MONTHS = [
@@ -17,17 +21,22 @@ const MONTHS = [
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
-export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date())
+export default function WorkoutCalendar({ 
+  userId, 
+  onNavigateToRecord, 
+  refreshTrigger, 
+  selectedMonth, 
+  onMonthChange 
+}: WorkoutCalendarProps) {
+  const [currentDate, setCurrentDate] = useState(selectedMonth || new Date())
   const [workoutDates, setWorkoutDates] = useState<Record<string, { count: number; maxRpe: number }>>({})
   const [loading, setLoading] = useState(false)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
-  useEffect(() => {
-    loadMonthlyWorkouts()
-  }, [userId, currentDate])
-
-  const loadMonthlyWorkouts = async () => {
+  const loadMonthlyWorkouts = useCallback(async () => {
     if (!userId) {
+      setWorkoutDates({})
       setLoading(false)
       return
     }
@@ -43,7 +52,17 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId, currentDate])
+
+  useEffect(() => {
+    if (selectedMonth && selectedMonth.getTime() !== currentDate.getTime()) {
+      setCurrentDate(selectedMonth)
+    }
+  }, [selectedMonth, currentDate])
+  
+  useEffect(() => {
+    loadMonthlyWorkouts()
+  }, [loadMonthlyWorkouts, refreshTrigger])
 
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear()
@@ -75,8 +94,43 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
       } else {
         newDate.setMonth(prev.getMonth() + 1)
       }
+      onMonthChange?.(newDate)
       return newDate
     })
+  }
+  
+  // Handle touch events for swipe gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+  
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > 50
+    const isRightSwipe = distance < -50
+    
+    if (isLeftSwipe) {
+      navigateMonth('next')
+    } else if (isRightSwipe) {
+      navigateMonth('prev')
+    }
+  }
+  
+  const handleDayClick = (day: number) => {
+    if (!onNavigateToRecord) return
+    
+    const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
+    const today = new Date()
+    const isToday = clickedDate.toDateString() === today.toDateString()
+    
+    onNavigateToRecord(clickedDate, isToday)
   }
 
   const getRpeIntensity = (maxRpe: number) => {
@@ -118,7 +172,11 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent 
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {loading ? (
           <div className="text-center py-4">読み込み中...</div>
         ) : (
@@ -153,6 +211,7 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
                       ${isToday ? 'ring-2 ring-blue-500' : ''}
                     `}
                     title={day && workoutCount > 0 ? `${workoutCount}回のワークアウト${maxRpe > 0 ? `（最高RPE: ${maxRpe}）` : ''}` : ''}
+                    onClick={day ? () => handleDayClick(day) : undefined}
                   >
                     {day && (
                       <div className="flex flex-col items-center">
