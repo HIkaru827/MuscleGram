@@ -27,6 +27,11 @@ export default function WorkoutStats({ userId }: WorkoutStatsProps) {
   }, [userId])
 
   const loadUserStats = async () => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
     try {
       const userStats = await getUserStats(userId)

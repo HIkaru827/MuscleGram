@@ -27,6 +27,11 @@ export default function WorkoutCalendar({ userId }: WorkoutCalendarProps) {
   }, [userId, currentDate])
 
   const loadMonthlyWorkouts = async () => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
     try {
       const year = currentDate.getFullYear()

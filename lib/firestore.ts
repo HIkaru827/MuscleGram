@@ -996,6 +996,10 @@ export const subscribeToUserNotifications = (userId: string, callback: (notifica
 
 // ユーザーの統計情報を取得
 export const getUserStats = async (userId: string) => {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+  
   try {
     const postsQuery = query(
       collection(db, COLLECTIONS.POSTS),
@@ -1070,6 +1074,10 @@ export const getUserStats = async (userId: string) => {
 
 // 月別ワークアウト頻度を取得 (カレンダー表示用)
 export const getMonthlyWorkouts = async (userId: string, year: number, month: number) => {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+  
   try {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 0, 23, 59, 59)

@@ -33,7 +33,8 @@ export function NotificationInitializer() {
           const fcmToken = pushNotificationManager.getFCMToken()
           if (fcmToken && user?.uid) {
             try {
-              await fetch('/api/fcm-token', {
+              console.log('Attempting to store FCM token for user:', user.uid)
+              const response = await fetch('/api/fcm-token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -41,12 +42,19 @@ export function NotificationInitializer() {
                   token: fcmToken
                 })
               })
-              console.log('FCM token stored successfully')
+              
+              if (!response.ok) {
+                console.error('FCM token API responded with status:', response.status)
+                const errorText = await response.text()
+                console.error('FCM token API error response:', errorText)
+              } else {
+                console.log('FCM token stored successfully')
+              }
             } catch (error) {
               console.error('Failed to store FCM token:', error)
             }
           } else {
-            console.log('No FCM token available to store')
+            console.log('No FCM token available to store. FCM token:', fcmToken, 'User ID:', user?.uid)
           }
         }, 1000)
         
