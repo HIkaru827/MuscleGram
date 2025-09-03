@@ -119,17 +119,34 @@ export class PushNotificationManager {
    * ローカル通知を表示する
    */
   async showNotification(options: PushNotificationOptions): Promise<void> {
-    console.log('showNotification called with options:', options)
+    console.log('🔔 showNotification called with options:', options)
+    
+    // Check if notifications are supported
+    if (!this.isSupported()) {
+      console.error('❌ Push notifications are not supported on this device/browser')
+      throw new Error('Push notifications not supported')
+    }
     
     const permission = await this.requestPermission()
-    console.log('Permission check result:', permission)
+    console.log('🔒 Permission check result:', permission)
     
     if (permission !== 'granted') {
-      console.warn('通知許可が得られていません')
+      console.warn('⚠️ 通知許可が得られていません - Permission:', permission)
       throw new Error('Notification permission not granted')
     }
+    
+    console.log('✅ Notification permission granted, proceeding with notification')
 
     try {
+      // Force direct browser notification for testing on localhost
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      
+      if (isLocalhost) {
+        console.log('🔧 Development mode: Using direct browser notification (localhost bypass)')
+        this.createDirectNotification(options)
+        return
+      }
+      
       if (this.registration && this.registration.active) {
         console.log('Using Service Worker notification, registration:', this.registration)
         console.log('Service Worker state:', this.registration.active.state)
@@ -184,7 +201,7 @@ export class PushNotificationManager {
    * 直接ブラウザ通知を作成する（フォールバック用）
    */
   private createDirectNotification(options: PushNotificationOptions): void {
-    console.log('Creating direct browser notification')
+    console.log('🔔 Creating direct browser notification')
     
     const notification = new Notification(options.title, {
       body: options.body,
@@ -196,7 +213,10 @@ export class PushNotificationManager {
       requireInteraction: false
     })
     
-    console.log('Direct browser notification created:', notification)
+    console.log('✅ Direct browser notification created:', notification)
+    
+    // Force badge update for direct notifications
+    this.setBadgeCount(1).catch(err => console.error('Badge update failed:', err))
     
     // Add click handler
     notification.onclick = () => {
@@ -402,20 +422,34 @@ export class PushNotificationManager {
 export const pushNotificationManager = PushNotificationManager.getInstance()
 
 // 通知タイプ別のヘルパー関数
-export const createLikeNotification = (userName: string, postPreview?: string) => {
+export const createLikeNotification = async (userName: string, postPreview?: string) => {
   console.log('📱 createLikeNotification called for user:', userName)
-  return pushNotificationManager.showNotification({
-    title: '新しいいいね',
-    body: `${userName}さんがあなたの投稿にいいねしました`,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: 'like-notification',
-    data: { type: 'like', url: '/home' },
-    actions: [
-      { action: 'view', title: '見る', icon: '/icon-192.png' },
-      { action: 'close', title: '閉じる' }
-    ]
-  })
+  
+  try {
+    // Update app badge count first
+    console.log('🔔 Updating app badge...')
+    await pushNotificationManager.setBadgeCount(1)
+    
+    // Show the notification
+    console.log('🔔 Showing like notification...')
+    await pushNotificationManager.showNotification({
+      title: '新しいいいね',
+      body: `${userName}さんがあなたの投稿にいいねしました`,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'like-notification',
+      data: { type: 'like', url: '/home' },
+      actions: [
+        { action: 'view', title: '見る', icon: '/icon-192.png' },
+        { action: 'close', title: '閉じる' }
+      ]
+    })
+    
+    console.log('✅ Like notification and badge updated successfully')
+  } catch (error) {
+    console.error('❌ Error in createLikeNotification:', error)
+    throw error
+  }
 }
 
 export const createCommentNotification = (userName: string, comment: string) => {
