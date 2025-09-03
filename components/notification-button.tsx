@@ -94,9 +94,35 @@ export default function NotificationButton() {
     try {
       const unsubscribe = subscribeToUserNotifications(user.uid, (firestoreNotifications) => {
         try {
+          const previousUnreadCount = unreadCount
+          const newUnreadCount = firestoreNotifications.filter(n => !n.read).length
+          
           setNotifications(firestoreNotifications)
-          setUnreadCount(firestoreNotifications.filter(n => !n.read).length)
+          setUnreadCount(newUnreadCount)
           setLoading(false)
+          
+          // 新しい未読通知がある場合、プッシュ通知とバッジを表示
+          if (newUnreadCount > previousUnreadCount && newUnreadCount > 0) {
+            const latestNotification = firestoreNotifications
+              .filter(n => !n.read)
+              .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]
+            
+            if (latestNotification) {
+              console.log('🔔 New notification received, showing push notification')
+              
+              // プッシュ通知を表示
+              pushNotificationManager.showNotification({
+                title: latestNotification.title,
+                body: latestNotification.message,
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                tag: `${latestNotification.type}-notification`,
+                data: { type: latestNotification.type, url: latestNotification.actionUrl || '/home' }
+              }).catch(error => {
+                console.error('Failed to show push notification:', error)
+              })
+            }
+          }
         } catch (callbackError) {
           console.error('Error processing notifications:', callbackError)
           // フォールバック: エラー時は空の状態で表示

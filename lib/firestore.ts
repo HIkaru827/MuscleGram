@@ -263,14 +263,9 @@ export const toggleLike = async (postId: string, userId: string) => {
             })
             console.log('✅ Database notification created')
 
-            // Trigger push notification
-            console.log('📱 Triggering push notification...')
-            try {
-              await createLikeNotification(likerUser.displayName || 'ユーザー')
-              console.log('✅ Push notification sent successfully')
-            } catch (pushError) {
-              console.error('❌ Error sending push notification for like:', pushError)
-            }
+            // プッシュ通知はFirebase Cloud Functionsまたは投稿者のデバイスで処理される
+            // クライアントサイドからは送信しない
+            console.log('📱 Push notification will be handled by the recipient device or server')
           }
         } catch (notificationError) {
           console.error('Error creating like notification:', notificationError)
