@@ -16,6 +16,7 @@ import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { toast } from "sonner"
 import UserProfileScreen from "./user-profile-screen"
+import { debugLog } from "@/lib/debug"
 
 export default function HomeScreen() {
   const { user, refreshUserProfile } = useAuth()
@@ -24,7 +25,7 @@ export default function HomeScreen() {
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({})
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   
-  console.log('HomeScreen render:', { 
+  debugLog.log('HomeScreen render:', { 
     userUID: user?.uid, 
     userEmail: user?.email, 
     userDisplayName: user?.displayName,
@@ -36,16 +37,16 @@ export default function HomeScreen() {
   const [deleting, setDeleting] = useState(false)
 
   const handleLike = async (postId: string) => {
-    console.log('🚨 CLICK: handleLike called for post:', postId, 'by user:', user?.uid)
+    debugLog.log('🚨 CLICK: handleLike called for post:', postId, 'by user:', user?.uid)
     if (!user) {
-      console.log('❌ No user logged in')
+      debugLog.log('❌ No user logged in')
       return
     }
     
     try {
-      console.log('🚀 Calling toggleLike function...')
+      debugLog.log('🚀 Calling toggleLike function...')
       const newIsLiked = await toggleLike(postId, user.uid)
-      console.log('✅ toggleLike completed, newIsLiked:', newIsLiked)
+      debugLog.log('✅ toggleLike completed, newIsLiked:', newIsLiked)
       setPosts(prevPosts =>
         prevPosts.map(post =>
           post.id === postId

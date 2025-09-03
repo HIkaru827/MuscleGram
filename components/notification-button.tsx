@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/AuthContext"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
+import { debugLog } from "@/lib/debug"
 import { 
   getUserNotifications, 
   markNotificationAsRead, 
@@ -108,7 +109,7 @@ export default function NotificationButton() {
               .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]
             
             if (latestNotification) {
-              console.log('🔔 New notification received, showing push notification')
+              debugLog.log('🔔 New notification received, showing push notification')
               
               // プッシュ通知を表示
               pushNotificationManager.showNotification({

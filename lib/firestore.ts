@@ -23,6 +23,7 @@ import { db } from './firebase'
 import { WorkoutPost, Comment, User, Follow } from '@/types'
 import { PRRecord } from './pr-utils'
 import { pushNotificationManager, createLikeNotification, createCommentNotification, createFollowNotification } from './push-notifications'
+import { debugLog } from './debug'
 
 // Collections
 export const COLLECTIONS = {
@@ -177,7 +178,7 @@ export const getPost = async (postId: string): Promise<WorkoutPost | null> => {
 
 // Likes
 export const toggleLike = async (postId: string, userId: string) => {
-  console.log('❤️ toggleLike called:', { postId, userId })
+  debugLog.log('❤️ toggleLike called:', { postId, userId })
   try {
     const postRef = doc(db, COLLECTIONS.POSTS, postId)
     const postSnap = await getDoc(postRef)
@@ -188,11 +189,11 @@ export const toggleLike = async (postId: string, userId: string) => {
 
     const postData = postSnap.data() as WorkoutPost
     const isLiked = postData.likedBy?.includes(userId) || false
-    console.log('👍 Current like status:', isLiked ? 'UNLIKING' : 'LIKING')
+    debugLog.log('👍 Current like status:', isLiked ? 'UNLIKING' : 'LIKING')
 
     if (isLiked) {
       // Unlike
-      console.log('💔 Unliking post...')
+      debugLog.log('💔 Unliking post...')
       await updateDoc(postRef, {
         likes: increment(-1),
         likedBy: arrayRemove(userId),
@@ -200,7 +201,7 @@ export const toggleLike = async (postId: string, userId: string) => {
       })
     } else {
       // Like
-      console.log('❤️ Liking post...')
+      debugLog.log('❤️ Liking post...')
       await updateDoc(postRef, {
         likes: increment(1),
         likedBy: arrayUnion(userId),
@@ -208,7 +209,7 @@ export const toggleLike = async (postId: string, userId: string) => {
       })
 
       // Create notification for the post owner (if not liking own post)
-      console.log('🔍 Checking notification conditions:', {
+      debugLog.log('🔍 Checking notification conditions:', {
         postUserId: postData.userId,
         likerUserId: userId,
         shouldCreateNotification: postData.userId !== userId,
@@ -221,12 +222,12 @@ export const toggleLike = async (postId: string, userId: string) => {
         getUser(userId)
       ])
       
-      console.log('👥 User details:', {
+      debugLog.log('👥 User details:', {
         postAuthor: { uid: postAuthor?.uid, email: postAuthor?.email, displayName: postAuthor?.displayName },
         liker: { uid: likerUser?.uid, email: likerUser?.email, displayName: likerUser?.displayName }
       })
       
-      console.log('🚨 CRITICAL DATA MISMATCH DETECTED!', {
+      debugLog.log('🚨 CRITICAL DATA MISMATCH DETECTED!', {
         postDataUserId: postData.userId,
         postAuthorFromDB: postAuthor?.uid,
         postAuthorEmail: postAuthor?.email,
@@ -236,16 +237,16 @@ export const toggleLike = async (postId: string, userId: string) => {
         ISSUE: postData.userId !== postAuthor?.uid ? 'POST DATA CORRUPTION!' : 'Data is consistent'
       })
       if (postData.userId !== userId) {
-        console.log('🔔 Like notification process started for post:', postId)
+        debugLog.log('🔔 Like notification process started for post:', postId)
         try {
           // Get the user who liked the post
           const likerUser = await getUser(userId)
-          console.log('👤 Liker user:', likerUser?.displayName)
+          debugLog.log('👤 Liker user:', likerUser?.displayName)
           
           if (likerUser) {
             // Create database notification
-            console.log('📝 Creating database notification...')
-            console.log('🔍 Debug notification data:', {
+            debugLog.log('📝 Creating database notification...')
+            debugLog.log('🔍 Debug notification data:', {
               recipientId: postData.userId,
               fromUserId: userId,
               postAuthor: postData.userId,
@@ -261,11 +262,11 @@ export const toggleLike = async (postId: string, userId: string) => {
               relatedPostId: postId,
               actionUrl: '/home'
             })
-            console.log('✅ Database notification created')
+            debugLog.log('✅ Database notification created')
 
             // プッシュ通知はFirebase Cloud Functionsまたは投稿者のデバイスで処理される
             // クライアントサイドからは送信しない
-            console.log('📱 Push notification will be handled by the recipient device or server')
+            debugLog.log('📱 Push notification will be handled by the recipient device or server')
           }
         } catch (notificationError) {
           console.error('Error creating like notification:', notificationError)

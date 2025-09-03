@@ -2,6 +2,7 @@
 
 import { getMessagingInstance } from './firebase'
 import { getToken, onMessage } from 'firebase/messaging'
+import { debugLog } from './debug'
 
 export interface PushNotificationOptions {
   title: string
@@ -119,7 +120,7 @@ export class PushNotificationManager {
    * ローカル通知を表示する
    */
   async showNotification(options: PushNotificationOptions): Promise<void> {
-    console.log('🔔 showNotification called with options:', options)
+    debugLog.log('🔔 showNotification called with options:', options)
     
     // Check if notifications are supported
     if (!this.isSupported()) {
@@ -128,14 +129,14 @@ export class PushNotificationManager {
     }
     
     const permission = await this.requestPermission()
-    console.log('🔒 Permission check result:', permission)
+    debugLog.log('🔒 Permission check result:', permission)
     
     if (permission !== 'granted') {
       console.warn('⚠️ 通知許可が得られていません - Permission:', permission)
       throw new Error('Notification permission not granted')
     }
     
-    console.log('✅ Notification permission granted, proceeding with notification')
+    debugLog.log('✅ Notification permission granted, proceeding with notification')
 
     try {
       // Check if we should force Service Worker notifications for background testing
@@ -143,8 +144,8 @@ export class PushNotificationManager {
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
       
       if (isLocalhost && !forceServiceWorker) {
-        console.log('🔧 Development mode: Using direct browser notification (localhost bypass)')
-        console.log('💡 To test Service Worker notifications, run: localStorage.setItem("force-sw-notifications", "true")')
+        debugLog.log('🔧 Development mode: Using direct browser notification (localhost bypass)')
+        debugLog.log('💡 To test Service Worker notifications, run: localStorage.setItem("force-sw-notifications", "true")')
         this.createDirectNotification(options)
         return
       }
