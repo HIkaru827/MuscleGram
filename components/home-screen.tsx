@@ -24,7 +24,13 @@ export default function HomeScreen() {
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({})
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   
-  console.log('HomeScreen render:', { user: user?.uid, posts: posts.length, loading })
+  console.log('HomeScreen render:', { 
+    userUID: user?.uid, 
+    userEmail: user?.email, 
+    userDisplayName: user?.displayName,
+    posts: posts.length, 
+    loading 
+  })
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [postToDelete, setPostToDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)

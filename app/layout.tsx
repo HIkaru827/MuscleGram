@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s | MuscleGram"
   },
   description: "筋力トレーニングに特化したソーシャルネットワークアプリ。筋トレ記録、分析、継続サポート、他のユーザーとの交流であなたのワークアウトを強力にサポート！",
-  keywords: ["筋トレ", "フィットネス", "ワークアウト", "記録", "分析", "SNS", "筋力トレーニング", "トレーニング記録", "PR記録", "AI分析", "パーソナライズド", "筋トレアプリ", "フィットネスアプリ", "トレーニングアプリ", "筋トレSNS"],
+  keywords: ["筋トレ", "シンプル", "ワークアウト", "記録", "分析", "SNS", "筋力トレーニング", "トレーニング記録", "PR記録", "AI分析", "使いやすい", "筋トレアプリ", "トレーニングアプリ", "筋トレSNS", "無料",],
   authors: [{ name: "MuscleGram Team" }],
   creator: "MuscleGram",
   publisher: "MuscleGram",

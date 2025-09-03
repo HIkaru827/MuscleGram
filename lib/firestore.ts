@@ -214,6 +214,27 @@ export const toggleLike = async (postId: string, userId: string) => {
         shouldCreateNotification: postData.userId !== userId,
         postData: postData
       })
+      
+      // Get more details about users
+      const [postAuthor, likerUser] = await Promise.all([
+        getUser(postData.userId),
+        getUser(userId)
+      ])
+      
+      console.log('👥 User details:', {
+        postAuthor: { uid: postAuthor?.uid, email: postAuthor?.email, displayName: postAuthor?.displayName },
+        liker: { uid: likerUser?.uid, email: likerUser?.email, displayName: likerUser?.displayName }
+      })
+      
+      console.log('🚨 CRITICAL DATA MISMATCH DETECTED!', {
+        postDataUserId: postData.userId,
+        postAuthorFromDB: postAuthor?.uid,
+        postAuthorEmail: postAuthor?.email,
+        likerUserId: userId,
+        likerFromDB: likerUser?.uid,
+        likerEmail: likerUser?.email,
+        ISSUE: postData.userId !== postAuthor?.uid ? 'POST DATA CORRUPTION!' : 'Data is consistent'
+      })
       if (postData.userId !== userId) {
         console.log('🔔 Like notification process started for post:', postId)
         try {
