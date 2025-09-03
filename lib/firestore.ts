@@ -218,6 +218,13 @@ export const toggleLike = async (postId: string, userId: string) => {
           if (likerUser) {
             // Create database notification
             console.log('📝 Creating database notification...')
+            console.log('🔍 Debug notification data:', {
+              recipientId: postData.userId,
+              fromUserId: userId,
+              postAuthor: postData.userId,
+              likerUserId: userId,
+              likerName: likerUser.displayName
+            })
             await createNotification({
               type: 'like',
               title: 'いいねされました',
