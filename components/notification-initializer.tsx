@@ -28,30 +28,26 @@ export function NotificationInitializer() {
       if (permission === 'granted') {
         console.log('Notifications enabled for user:', user?.uid)
         
-        // Wait a bit for FCM token to be generated, then store it
+        // Wait a bit for FCM token to be generated, then store it directly in Firestore
         setTimeout(async () => {
           const fcmToken = pushNotificationManager.getFCMToken()
           if (fcmToken && user?.uid) {
             try {
               console.log('Attempting to store FCM token for user:', user.uid)
-              const response = await fetch('/api/fcm-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: user.uid,
-                  token: fcmToken
-                })
+              
+              // Import Firestore functions dynamically
+              const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+              const { db } = await import('@/lib/firebase')
+              
+              const userRef = doc(db, 'users', user.uid)
+              await updateDoc(userRef, {
+                fcmToken: fcmToken,
+                fcmTokenUpdatedAt: serverTimestamp()
               })
               
-              if (!response.ok) {
-                console.error('FCM token API responded with status:', response.status)
-                const errorText = await response.text()
-                console.error('FCM token API error response:', errorText)
-              } else {
-                console.log('FCM token stored successfully')
-              }
+              console.log('FCM token stored successfully in Firestore')
             } catch (error) {
-              console.error('Failed to store FCM token:', error)
+              console.error('Failed to store FCM token in Firestore:', error)
             }
           } else {
             console.log('No FCM token available to store. FCM token:', fcmToken, 'User ID:', user?.uid)
