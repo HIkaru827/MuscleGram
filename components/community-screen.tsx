@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MessageCircle, Users, Calendar, Plus, Send, ImageIcon, MapPin, UserCheck } from "lucide-react"
+import { MessageCircle, Users, Calendar, Plus, Send, ImageIcon, MapPin, UserCheck, UserPlus } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,12 +16,16 @@ import { db } from "@/lib/firebase"
 import { User } from "@/types"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
+import { followUser, unfollowUser, isFollowing } from "@/lib/firestore"
+import { toast } from "sonner"
 
 export default function CommunityScreen() {
   const { user } = useAuth()
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [activeUsers, setActiveUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({})
+  const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const loadCommunityData = async () => {
@@ -64,6 +68,19 @@ export default function CommunityScreen() {
         // Set recently joined users as "active"
         setActiveUsers(users.slice(0, 10))
 
+        // Check follow status for all users
+        const followStatusPromises = users.map(async (targetUser) => {
+          const following = await isFollowing(user.uid, targetUser.uid)
+          return { userId: targetUser.uid, following }
+        })
+
+        const followResults = await Promise.all(followStatusPromises)
+        const followStatusMap: Record<string, boolean> = {}
+        followResults.forEach(({ userId, following }) => {
+          followStatusMap[userId] = following
+        })
+        setFollowStatus(followStatusMap)
+
       } catch (error) {
         console.error('Error loading community data:', error)
       } finally {
@@ -73,6 +90,31 @@ export default function CommunityScreen() {
 
     loadCommunityData()
   }, [user])
+
+  const handleFollow = async (targetUserId: string) => {
+    if (!user) return
+
+    setFollowLoading(prev => ({ ...prev, [targetUserId]: true }))
+
+    try {
+      const isCurrentlyFollowing = followStatus[targetUserId]
+      
+      if (isCurrentlyFollowing) {
+        await unfollowUser(user.uid, targetUserId)
+        setFollowStatus(prev => ({ ...prev, [targetUserId]: false }))
+        toast.success("フォローを解除しました")
+      } else {
+        await followUser(user.uid, targetUserId)
+        setFollowStatus(prev => ({ ...prev, [targetUserId]: true }))
+        toast.success("フォローしました")
+      }
+    } catch (error) {
+      console.error('Error following/unfollowing user:', error)
+      toast.error("フォロー操作に失敗しました")
+    } finally {
+      setFollowLoading(prev => ({ ...prev, [targetUserId]: false }))
+    }
+  }
 
   if (!user) {
     return (
@@ -141,9 +183,20 @@ export default function CommunityScreen() {
                           <span>フォロワー: {member.followers || 0}</span>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm">
-                        <UserCheck className="w-4 h-4 mr-1" />
-                        フォロー
+                      <Button 
+                        variant={followStatus[member.uid] ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleFollow(member.uid)}
+                        disabled={followLoading[member.uid]}
+                      >
+                        {followLoading[member.uid] ? (
+                          <div className="w-4 h-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : followStatus[member.uid] ? (
+                          <UserCheck className="w-4 h-4 mr-1" />
+                        ) : (
+                          <UserPlus className="w-4 h-4 mr-1" />
+                        )}
+                        {followStatus[member.uid] ? "フォロー中" : "フォロー"}
                       </Button>
                     </div>
                   ))}
@@ -185,8 +238,25 @@ export default function CommunityScreen() {
                           <div className="text-right text-sm text-gray-500">
                             <div>投稿 {member.postsCount || 0}</div>
                           </div>
-                          <Button variant="outline" size="sm">
-                            フォロー
+                          <Button 
+                            variant={followStatus[member.uid] ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleFollow(member.uid)}
+                            disabled={followLoading[member.uid]}
+                          >
+                            {followLoading[member.uid] ? (
+                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : followStatus[member.uid] ? (
+                              <>
+                                <UserCheck className="w-4 h-4 mr-1" />
+                                フォロー中
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus className="w-4 h-4 mr-1" />
+                                フォロー
+                              </>
+                            )}
                           </Button>
                         </div>
                       </div>

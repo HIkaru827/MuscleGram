@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import UserProfileScreen from "./user-profile-screen"
 import { Settings, Edit, Users, Award, LogOut, Bell, Shield, Camera, CalendarIcon, Heart, MessageCircle, Share, MoreHorizontal, Trash2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -15,8 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/AuthContext"
-import { getPosts, toggleLike, deletePost } from "@/lib/firestore"
-import { WorkoutPost } from "@/types"
+import { getPosts, toggleLike, deletePost, getFollowers, getFollowing } from "@/lib/firestore"
+import { WorkoutPost, User } from "@/types"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { doc, updateDoc } from "firebase/firestore"
@@ -28,6 +29,12 @@ import NotificationSettings from "./notification-settings"
 export default function ProfileScreen() {
   const { user, userProfile, logout, refreshUserProfile, clearPWACache } = useAuth()
   const [userPosts, setUserPosts] = useState<WorkoutPost[]>([])
+  const [followers, setFollowers] = useState<User[]>([])
+  const [following, setFollowing] = useState<User[]>([])
+  const [showFollowersDialog, setShowFollowersDialog] = useState(false)
+  const [showFollowingDialog, setShowFollowingDialog] = useState(false)
+  const [loadingFollowData, setLoadingFollowData] = useState(false)
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingProfile, setEditingProfile] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -120,6 +127,54 @@ export default function ProfileScreen() {
 
     loadUserData()
   }, [user])
+
+  const handleShowFollowers = async () => {
+    if (!user || loadingFollowData) return
+    
+    setLoadingFollowData(true)
+    try {
+      const followersData = await getFollowers(user.uid)
+      setFollowers(followersData)
+      setShowFollowersDialog(true)
+    } catch (error) {
+      console.error('Error loading followers:', error)
+      toast.error("フォロワー情報の取得に失敗しました")
+    } finally {
+      setLoadingFollowData(false)
+    }
+  }
+
+  const handleShowFollowing = async () => {
+    if (!user || loadingFollowData) return
+    
+    setLoadingFollowData(true)
+    try {
+      const followingData = await getFollowing(user.uid)
+      setFollowing(followingData)
+      setShowFollowingDialog(true)
+    } catch (error) {
+      console.error('Error loading following:', error)
+      toast.error("フォロー情報の取得に失敗しました")
+    } finally {
+      setLoadingFollowData(false)
+    }
+  }
+
+  const handleUserClick = (clickedUser: User) => {
+    // Close dialogs first
+    setShowFollowersDialog(false)
+    setShowFollowingDialog(false)
+    
+    // Don't show profile for the current user
+    if (clickedUser.uid === user?.uid) return
+    
+    // Set viewing user ID to show their profile
+    setViewingUserId(clickedUser.uid)
+  }
+
+  const handleBackToProfile = () => {
+    setViewingUserId(null)
+  }
 
   const handleProfileUpdate = async () => {
     if (!user || !userProfile) return
@@ -270,6 +325,11 @@ export default function ProfileScreen() {
     }
   }
 
+  // Show user profile if viewing a specific user
+  if (viewingUserId) {
+    return <UserProfileScreen userId={viewingUserId} onBack={handleBackToProfile} />
+  }
+
   if (!user || !userProfile) {
     return (
       <div className="max-w-2xl mx-auto p-4">
@@ -329,14 +389,22 @@ export default function ProfileScreen() {
                   
                   {/* フォロー統計 */}
                   <div className="flex items-center space-x-6 mt-2">
-                    <div className="flex items-center space-x-1">
+                    <button 
+                      className="flex items-center space-x-1 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors"
+                      onClick={() => handleShowFollowing()}
+                      disabled={loadingFollowData}
+                    >
                       <span className="font-semibold text-gray-900">{userProfile.following || 0}</span>
                       <span className="text-sm text-gray-600">フォロー</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
+                    </button>
+                    <button 
+                      className="flex items-center space-x-1 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors"
+                      onClick={() => handleShowFollowers()}
+                      disabled={loadingFollowData}
+                    >
                       <span className="font-semibold text-gray-900">{userProfile.followers || 0}</span>
                       <span className="text-sm text-gray-600">フォロワー</span>
-                    </div>
+                    </button>
                   </div>
                 </div>
                 <Dialog open={editingProfile} onOpenChange={setEditingProfile}>
@@ -689,6 +757,76 @@ export default function ProfileScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Followers Dialog */}
+      <Dialog open={showFollowersDialog} onOpenChange={setShowFollowersDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>フォロワー</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {followers.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">フォロワーがいません</p>
+            ) : (
+              followers.map((follower) => (
+                <div 
+                  key={follower.uid} 
+                  className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                  onClick={() => handleUserClick(follower)}
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={follower.photoURL || "/placeholder.svg"} alt={follower.displayName} />
+                    <AvatarFallback className="bg-red-100 text-red-600">
+                      {follower.displayName?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{follower.displayName || 'Unknown User'}</p>
+                    {follower.bio && (
+                      <p className="text-sm text-gray-500 truncate">{follower.bio}</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Following Dialog */}
+      <Dialog open={showFollowingDialog} onOpenChange={setShowFollowingDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>フォロー中</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {following.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">フォロー中のユーザーがいません</p>
+            ) : (
+              following.map((followingUser) => (
+                <div 
+                  key={followingUser.uid} 
+                  className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                  onClick={() => handleUserClick(followingUser)}
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={followingUser.photoURL || "/placeholder.svg"} alt={followingUser.displayName} />
+                    <AvatarFallback className="bg-red-100 text-red-600">
+                      {followingUser.displayName?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{followingUser.displayName || 'Unknown User'}</p>
+                    {followingUser.bio && (
+                      <p className="text-sm text-gray-500 truncate">{followingUser.bio}</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

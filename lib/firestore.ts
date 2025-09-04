@@ -464,6 +464,70 @@ export const isFollowing = async (followerId: string, followingId: string): Prom
   }
 }
 
+export const getFollowers = async (userId: string): Promise<User[]> => {
+  try {
+    // Get all follow relationships where this user is being followed
+    const followsQuery = query(
+      collection(db, COLLECTIONS.FOLLOWS),
+      where('followingId', '==', userId)
+    )
+    const followsSnapshot = await getDocs(followsQuery)
+    
+    // Get follower user IDs
+    const followerIds = followsSnapshot.docs.map(doc => doc.data().followerId)
+    
+    if (followerIds.length === 0) {
+      return []
+    }
+    
+    // Get user details for each follower
+    const followers: User[] = []
+    for (const followerId of followerIds) {
+      const user = await getUser(followerId)
+      if (user) {
+        followers.push(user)
+      }
+    }
+    
+    return followers
+  } catch (error) {
+    console.error('Error getting followers:', error)
+    return []
+  }
+}
+
+export const getFollowing = async (userId: string): Promise<User[]> => {
+  try {
+    // Get all follow relationships where this user is following others
+    const followsQuery = query(
+      collection(db, COLLECTIONS.FOLLOWS),
+      where('followerId', '==', userId)
+    )
+    const followsSnapshot = await getDocs(followsQuery)
+    
+    // Get following user IDs
+    const followingIds = followsSnapshot.docs.map(doc => doc.data().followingId)
+    
+    if (followingIds.length === 0) {
+      return []
+    }
+    
+    // Get user details for each user being followed
+    const following: User[] = []
+    for (const followingId of followingIds) {
+      const user = await getUser(followingId)
+      if (user) {
+        following.push(user)
+      }
+    }
+    
+    return following
+  } catch (error) {
+    console.error('Error getting following:', error)
+    return []
+  }
+}
+
 // Real-time subscriptions
 export const subscribeToUserPosts = (
   userId: string,
