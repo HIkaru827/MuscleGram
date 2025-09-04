@@ -13,6 +13,7 @@ export class TrainingReminderManager {
   private static instance: TrainingReminderManager
   private checkInterval: NodeJS.Timeout | null = null
   private isRunning = false
+  private currentUserId: string | null = null
 
   private constructor() {}
 
@@ -24,16 +25,22 @@ export class TrainingReminderManager {
   }
 
   /**
-   * 週次リマインダーサービスを開始
+   * 週次リマインダーサービスを開始（特定のユーザーのみ）
    */
-  start(): void {
-    if (this.isRunning) {
-      console.log('Training reminder service is already running')
+  start(userId?: string): void {
+    if (this.isRunning && this.currentUserId === userId) {
+      console.log(`Training reminder service is already running for user: ${userId}`)
       return
     }
 
+    // 別のユーザーで実行中の場合は停止
+    if (this.isRunning && this.currentUserId !== userId) {
+      this.stop()
+    }
+
+    this.currentUserId = userId || null
     this.isRunning = true
-    console.log('Starting training reminder service...')
+    console.log(`Starting training reminder service for user: ${userId}`)
 
     // 1日に1回チェック (24時間 = 24 * 60 * 60 * 1000ms)
     this.checkInterval = setInterval(() => {
@@ -53,6 +60,7 @@ export class TrainingReminderManager {
       this.checkInterval = null
     }
     this.isRunning = false
+    this.currentUserId = null
     console.log('Training reminder service stopped')
   }
 
@@ -61,13 +69,43 @@ export class TrainingReminderManager {
    */
   private async checkAndSendReminders(): Promise<void> {
     try {
-      console.log('Checking for inactive users...')
+      // 現在のユーザーが設定されている場合は、そのユーザーのみをチェック
+      if (this.currentUserId) {
+        console.log(`Checking reminder for current user: ${this.currentUserId}`)
+        
+        // 今日既にリマインダーを受け取ったかチェック
+        if (!this.hasReceivedReminderToday(this.currentUserId)) {
+          // ユーザーが1週間非アクティブかチェック
+          const { getUserLastWorkoutDate } = await import('./firestore')
+          const lastWorkoutDate = await getUserLastWorkoutDate(this.currentUserId)
+          
+          const oneWeekAgo = new Date()
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+          
+          if (!lastWorkoutDate || lastWorkoutDate < oneWeekAgo) {
+            await this.sendTrainingReminder(this.currentUserId)
+          } else {
+            console.log(`Current user is active, no reminder needed`)
+          }
+        } else {
+          console.log(`Current user already received reminder today`)
+        }
+        return
+      }
+
+      // 管理者モード: 全ての非アクティブユーザーをチェック（テスト用）
+      console.log('Checking for all inactive users (admin mode)...')
       
       const inactiveUserIds = await checkInactiveUsers()
       console.log(`Found ${inactiveUserIds.length} inactive users`)
 
       for (const userId of inactiveUserIds) {
-        await this.sendTrainingReminder(userId)
+        // 今日既にリマインダーを受け取ったかチェック
+        if (!this.hasReceivedReminderToday(userId)) {
+          await this.sendTrainingReminder(userId)
+        } else {
+          console.log(`User ${userId} already received reminder today, skipping`)
+        }
       }
     } catch (error) {
       console.error('Error in checkAndSendReminders:', error)
@@ -173,10 +211,11 @@ export class TrainingReminderManager {
   /**
    * サービス状態を取得
    */
-  getStatus(): { isRunning: boolean; nextCheck: Date | null } {
+  getStatus(): { isRunning: boolean; nextCheck: Date | null; currentUserId: string | null } {
     return {
       isRunning: this.isRunning,
-      nextCheck: this.checkInterval ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null
+      nextCheck: this.checkInterval ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
+      currentUserId: this.currentUserId
     }
   }
 }

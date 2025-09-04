@@ -116,8 +116,8 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
         
         // Only start if user is logged in
         if (user) {
-          trainingReminderManager.start()
-          console.log('Training reminder service initialized')
+          trainingReminderManager.start(user.uid)
+          console.log(`Training reminder service initialized for user: ${user.uid}`)
         }
       } catch (error) {
         console.error('Error initializing training reminder service:', error)

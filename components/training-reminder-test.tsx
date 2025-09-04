@@ -19,9 +19,9 @@ export default function TrainingReminderTest() {
   const handleStartService = async () => {
     try {
       const { trainingReminderManager } = await import('@/lib/training-reminder')
-      trainingReminderManager.start()
+      trainingReminderManager.start(user?.uid)
       setIsServiceRunning(true)
-      toast.success("トレーニングリマインダーサービスを開始しました")
+      toast.success("トレーニングリマインダーサービスを開始しました（現在のユーザーのみ）")
     } catch (error) {
       console.error('Error starting service:', error)
       toast.error("サービスの開始に失敗しました")
@@ -101,7 +101,7 @@ export default function TrainingReminderTest() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">サービス状態</p>
-              <p className="text-sm text-gray-600">1週間非アクティブなユーザーに通知を送信</p>
+              <p className="text-sm text-gray-600">現在のユーザーが1週間非アクティブな場合に通知を送信</p>
             </div>
             <Badge variant={isServiceRunning ? "default" : "secondary"}>
               {isServiceRunning ? "稼働中" : "停止中"}
