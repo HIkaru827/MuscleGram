@@ -528,6 +528,54 @@ export const getFollowing = async (userId: string): Promise<User[]> => {
   }
 }
 
+export const getUserLastWorkoutDate = async (userId: string): Promise<Date | null> => {
+  try {
+    const postsQuery = query(
+      collection(db, COLLECTIONS.POSTS),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    )
+    const snapshot = await getDocs(postsQuery)
+    
+    if (snapshot.empty) {
+      return null
+    }
+    
+    const lastPost = snapshot.docs[0].data()
+    return lastPost.createdAt?.toDate() || null
+  } catch (error) {
+    console.error('Error getting user last workout date:', error)
+    return null
+  }
+}
+
+export const checkInactiveUsers = async (): Promise<string[]> => {
+  try {
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    
+    // Get all users
+    const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS))
+    const inactiveUserIds: string[] = []
+    
+    for (const userDoc of usersSnapshot.docs) {
+      const userId = userDoc.id
+      const lastWorkoutDate = await getUserLastWorkoutDate(userId)
+      
+      // If user has no workout or last workout was more than a week ago
+      if (!lastWorkoutDate || lastWorkoutDate < oneWeekAgo) {
+        inactiveUserIds.push(userId)
+      }
+    }
+    
+    return inactiveUserIds
+  } catch (error) {
+    console.error('Error checking inactive users:', error)
+    return []
+  }
+}
+
 // Real-time subscriptions
 export const subscribeToUserPosts = (
   userId: string,

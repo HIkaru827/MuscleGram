@@ -107,6 +107,33 @@ export default function FitnessApp({ defaultScreen = "home" }: FitnessAppProps) 
     initializeFunctionWarmup()
   }, [])
 
+  // Initialize training reminder service
+  React.useEffect(() => {
+    const initializeTrainingReminders = async () => {
+      try {
+        // Dynamic import to avoid SSR issues
+        const { trainingReminderManager } = await import('@/lib/training-reminder')
+        
+        // Only start if user is logged in
+        if (user) {
+          trainingReminderManager.start()
+          console.log('Training reminder service initialized')
+        }
+      } catch (error) {
+        console.error('Error initializing training reminder service:', error)
+      }
+    }
+
+    initializeTrainingReminders()
+    
+    // Cleanup on unmount
+    return () => {
+      import('@/lib/training-reminder').then(({ trainingReminderManager }) => {
+        trainingReminderManager.stop()
+      }).catch(console.error)
+    }
+  }, [user])
+
   // Initialize notification system when user is loaded
   React.useEffect(() => {
     if (user && !loading) {

@@ -25,6 +25,7 @@ import { db } from "@/lib/firebase"
 import { toast } from "sonner"
 import { uploadImage, validateImageFile, compressImage } from "@/lib/storage"
 import NotificationSettings from "./notification-settings"
+import TrainingReminderTest from "./training-reminder-test"
 
 export default function ProfileScreen() {
   const { user, userProfile, logout, refreshUserProfile, clearPWACache } = useAuth()
@@ -390,20 +391,20 @@ export default function ProfileScreen() {
                   {/* フォロー統計 */}
                   <div className="flex items-center space-x-6 mt-2">
                     <button 
-                      className="flex items-center space-x-1 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors"
+                      className="flex items-center space-x-1 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors min-w-0"
                       onClick={() => handleShowFollowing()}
                       disabled={loadingFollowData}
                     >
-                      <span className="font-semibold text-gray-900">{userProfile.following || 0}</span>
-                      <span className="text-sm text-gray-600">フォロー</span>
+                      <span className="font-semibold text-gray-900 shrink-0">{userProfile.following || 0}</span>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">フォロー</span>
                     </button>
                     <button 
-                      className="flex items-center space-x-1 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors"
+                      className="flex items-center space-x-1 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors min-w-0"
                       onClick={() => handleShowFollowers()}
                       disabled={loadingFollowData}
                     >
-                      <span className="font-semibold text-gray-900">{userProfile.followers || 0}</span>
-                      <span className="text-sm text-gray-600">フォロワー</span>
+                      <span className="font-semibold text-gray-900 shrink-0">{userProfile.followers || 0}</span>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">フォロワー</span>
                     </button>
                   </div>
                 </div>
@@ -686,6 +687,9 @@ export default function ProfileScreen() {
         <TabsContent value="settings" className="space-y-4">
           {/* トレーニング通知設定 */}
           <NotificationSettings />
+          
+          {/* トレーニングリマインダー設定 */}
+          <TrainingReminderTest />
           
           {/* その他の設定 */}
           <Card>
